@@ -23,11 +23,12 @@ import numpy as np
 from manim import *
 
 from studio.kit import primitives as kit
-from studio.kit.actors import Chip, packet
+from studio.kit.actors import (Badge, Band, Chat, Chip, CodeFile, Module, data_block, harness_clamps, harness_frame,
+                               packet, panel_frame)
 from studio.kit.i18n import Translator, current_lang
 from studio.kit.motions import dim, morph, send
 from studio.kit.scene import StudioScene
-from studio.kit.primitives import (BODY, CYAN, DIMC, GREEN, ICE, LABEL, MONO, ORANGE, RED, TITLE, flash_along, globe,
+from studio.kit.primitives import (BODY, CYAN, DIMC, GREEN, ICE, LABEL, MONO, NEON_OPS, ORANGE, RED, TITLE, flash_along, globe,
                                    icon_check, icon_doc, icon_format, icon_list, icon_lock, icon_log, icon_mail,
                                    icon_scope, icon_sheet, icon_tool_card, icon_user, neon, rack, rail, square_dot)
 
@@ -194,71 +195,6 @@ class Film(StudioScene):
             ("together", [self.a6_together]),
         ], "AI - Retrieving dynamic data")
 
-    PIN_SIDES = {"UP": 0, "DOWN": 1, "LEFT": 2, "RIGHT": 3}
-    PIN_OPS = (0.03, 0.07, 0.16, 1.0)  # opacities of the 3 halos + core (see neon)
-
-    def pin_parts(self, side, k):
-        i = self.PIN_SIDES[side] * 5 + (k + 2)
-        return [g[i] for g in self.chip.pins[0]] + [self.chip.pins[1][i]]
-
-    def hide_pins(self):
-        """Chip without pins: they only appear once connected."""
-        self.pins_on = set()
-        for side in self.PIN_SIDES:
-            for k in range(-2, 3):
-                for part in self.pin_parts(side, k):
-                    part.set_stroke(opacity=0)
-
-    def show_pins(self, *keys):
-        """Animations: show the pins (side, k) that receive a connection."""
-        anims = []
-        for side, k in keys:
-            if (side, k) in self.pins_on:
-                continue
-            self.pins_on.add((side, k))
-            for part, op in zip(self.pin_parts(side, k), self.PIN_OPS):
-                anims.append(part.animate.set_stroke(opacity=op))
-        return anims
-
-    def pin(self, k):
-        """Tip of the k-th bottom pin of the chip (k = -2 … 2, 0 = centre)."""
-        return self.chip.body.get_center() + np.array([-k * self.chip.size * 0.17, -(self.chip.size / 2 + 0.16), 0])
-
-    def make_chat(self):
-        win = RoundedRectangle(corner_radius=0.14, width=CHAT_W, height=CHAT_H).move_to(CHAT_C)
-        head = Line(win.get_corner(UL) + DOWN * 0.38, win.get_corner(UR) + DOWN * 0.38).set_stroke(DIMC, 1)
-        title = VGroup(Circle(0.05).set_fill(ORANGE, 1).set_stroke(width=0), L("CHAT · IA", 9, GREY_B, spacing=4))
-        title.arrange(RIGHT, buff=0.12).move_to(win.get_corner(UL) + np.array([0.22, -0.19, 0]), aligned_edge=LEFT)
-        self.chat_win = win
-        self.q_box = None
-        return VGroup(neon(win, ICE, 1.6, fill=BODY), head, title).set_z_index(3)
-
-    def chat_bubble_pos(self):
-        return self.chat_win.get_corner(UR) + np.array([-0.2, -0.62, 0])
-
-    def doc_to_question(self, text):
-        """The question is typed in the chat window (which stands for the user)."""
-        txt = L(text, 10, ICE, spacing=2)
-        box = RoundedRectangle(corner_radius=0.1, width=txt.width + 0.36, height=txt.height + 0.24)
-        box.set_fill(ManimColor("#0B2730"), 1).set_stroke(width=0)
-        bub = VGroup(box, txt.move_to(box)).move_to(self.chat_bubble_pos(), aligned_edge=UR).set_z_index(4)
-        anims = [FadeIn(box, shift=LEFT * 0.1)]
-        if self.q_box is not None:
-            anims.append(FadeOut(self.q_box))
-        self.play(*anims, run_time=0.3)
-        with self.exact():
-            self.play(AddTextLetterByLetter(txt, time_per_char=0.02), run_time=0.5)
-        self.q_box = box
-        return txt
-
-
-    def q_label(self, text):
-        """Question text placed in the chat bubble."""
-        q = L(text, 10, ICE, spacing=2).set_z_index(4)
-        if self.q_box is not None:
-            return q.move_to(self.q_box)
-        return q.move_to(self.chat_bubble_pos(), aligned_edge=UR)
-
     def ask(self, color=ICE, run_time=0.6):
         p = packet(color)
         send(self, p, [[IN_X, OUT_Y, 0], self.chip.port(LEFT)], color, run_time=run_time)
@@ -290,7 +226,7 @@ class Film(StudioScene):
         # on arrival the rails draw the outline, then the core, then the pins; the words slide
         # along their rail and melt into the chip
         chip = self.chip
-        self.hide_pins()
+        self.chip.hide_pins()
         traces, words = VGroup(), []
         for k, src in enumerate(sources):
             col, row = divmod(k, 3)
@@ -309,7 +245,7 @@ class Film(StudioScene):
         # 2 · energy flows and draws the chip: outline → core → pins
         self.play(*[flash_along(t, WHITE, 4, run_time=1.0) for t in traces],
                   Create(chip.body), Create(chip.wires), public.animate.set_opacity(1), run_time=0.8)
-        self.play(Create(chip.die), Create(chip.pins, lag_ratio=0.05), *self.show_pins(*pins_used), run_time=0.6)
+        self.play(Create(chip.die), Create(chip.pins, lag_ratio=0.05), *self.chip.show_pins(*pins_used), run_time=0.6)
         # 3 · the words slide along their rail and melt into the chip
         word_moves, ghosts = [], []
         for w in words:
@@ -369,11 +305,11 @@ class Film(StudioScene):
         in_rail = rail([[IN_X, OUT_Y, 0], chip.port(LEFT)], DIMC, 2)
         out_rail = rail([chip.port(RIGHT), ANS_IN], DIMC, 2)
         morph(self, VGroup(done, outs, tag, branches), VGroup(icon, in_rail, out_rail))
-        user = self.make_chat()
+        self.user = user = Chat(CHAT_C, CHAT_W, CHAT_H, tr("CHAT · IA"))
         self.play(FadeTransform(icon, user), run_time=0.55, rate_func=rate_functions.ease_in_out_cubic)
-        q_txt = self.doc_to_question("OUR CAR PARKS · PARIS?")
-        win = self.chat_win
-        u_bub = VGroup(self.q_box, q_txt)
+        q_txt = self.user.type_question(self, tr("OUR CAR PARKS · PARIS?"))
+        win = self.user.win
+        u_bub = VGroup(self.user.q_box, q_txt)
         q = VGroup()
         # the question goes from the chat to the chip
         p = packet(ICE)
@@ -386,7 +322,7 @@ class Film(StudioScene):
         web_rail = rail(web_pts, CYAN, 1.6)
         mem = L("MEMORY", 11, CYAN, spacing=4).next_to(chip, DOWN, 0.3)
         self.play(Create(web_rail), FadeIn(web), FadeIn(web_lbl), FadeIn(mem), chip.pulse(CYAN),
-                  *self.show_pins(("UP", 0)), run_time=0.5)
+                  *self.chip.show_pins(("UP", 0)), run_time=0.5)
         p = packet(CYAN)
         send(self, p, web_pts + list(reversed(web_pts))[1:], CYAN, run_time=0.55)
         self.remove(p)
@@ -418,7 +354,7 @@ class Film(StudioScene):
         guess = VGroup(u_bub, a_box, final)
         self.hold(0.5)
         self.user, self.in_rail, self.out_rail = user, in_rail, out_rail   # reused in act 3
-        self.q_box = None
+        self.user.q_box = None
         self.intro_bits = VGroup(web, web_lbl, web_rail, mem, guess)
 
     # --- 02 · Our reality: Paris -------------------------------------------------------------------------------
@@ -465,8 +401,8 @@ class Film(StudioScene):
         # our world unfolds: the boundary rises like a screen, the private area rolls out below
         # and pushes the chip (and the user) up, into the background
         # the user gets a context: they work at Indigo
-        self.badge = self.user_badge(0)
-        self.play(*self.show_pins(("DOWN", 0)), FadeIn(self.badge, shift=UP * 0.1), run_time=0.4)
+        self.badge = Badge(self.badge_text(0), self.user[0])
+        self.play(*self.chip.show_pins(("DOWN", 0)), FadeIn(self.badge, shift=UP * 0.1), run_time=0.4)
         self.pushed = VGroup(self.chip, self.user, self.in_rail, self.out_rail, self.badge)
         self.pushed.save_state()
         panel = Rectangle(width=FW + 0.4, height=SPLIT_Y + 4.2).set_fill(ManimColor("#03090E"), 1).set_stroke(width=0)
@@ -648,11 +584,11 @@ class Film(StudioScene):
         self.chapter("03 · THE PROBLEM", "The problem")
         self.build_wiring()
         # the question arrives… and the circuit is drawn as it goes down to the tables (direct access)
-        self.question = self.doc_to_question(QUESTION)
+        self.question = self.user.type_question(self, tr(QUESTION))
         self.ask()
         direct = L("DIRECT ACCESS TO TABLES", 12, RED, spacing=4).move_to([1.4, -0.45, 0])
         self.play(LaggedStart(*[Create(c) for c in self.chaos], lag_ratio=0.03),
-                  *self.show_pins(("DOWN", -1), ("DOWN", 1)),
+                  *self.chip.show_pins(("DOWN", -1), ("DOWN", 1)),
                   LaggedStart(*[FadeIn(j, scale=0.5) for j in self.joints], lag_ratio=0.1),
                   *[flash_along(c, ICE, 4, run_time=1.2) for c in self.chaos],
                   self.vault[0].animate.set_stroke(RED, opacity=0.8), FadeIn(direct), run_time=1.2)
@@ -675,7 +611,7 @@ class Film(StudioScene):
         self.seg1, self.seg2, self.seg3, self.cut_pts = VGroup(), VGroup(), [], []
         self.j1_pos, self.j2_pos = [], []
         for i, (pin_k, yb) in enumerate([(1, -0.38), (-1, -0.52)]):
-            p, j1 = self.pin(pin_k), J1_POS[i]
+            p, j1 = self.chip.pin(pin_k), J1_POS[i]
             self.seg1.add(red([p, [p[0], yb, 0], [j1[0], yb, 0], j1 + UP * 0.16]))
             self.j1_pos.append(j1)
             for j in range(2):
@@ -715,7 +651,7 @@ class Film(StudioScene):
     def node_style(self, n, color, f, animate=True):
         """Colour + intensity of a tree node (neon halo, stroke, fill, text), without flattening the halos."""
         glow, core = n[0]
-        targets = [(g, dict(color=color, opacity=self.PIN_OPS[j] * f)) for j, g in enumerate(glow)]
+        targets = [(g, dict(color=color, opacity=NEON_OPS[j] * f)) for j, g in enumerate(glow)]
         targets.append((core, dict(color=color, opacity=f)))
         out = []
         for m, kw in targets:
@@ -807,7 +743,8 @@ class Film(StudioScene):
         self.doubts = VGroup(*n1, *n2, count, amb)
 
     def a3_ambiguity(self):
-        band = RoundedRectangle(corner_radius=0.12, width=13.2, height=1.08).move_to([0, BAND_Y, 0])
+        self.mcp = Band(13.2, 1.08, [0, BAND_Y, 0], tr("MCP"), tr("MODEL CONTEXT PROTOCOL"))
+        band = self.mcp.shape
         c, w, h = FRAME
         # the harness frame rises above the chip to include the TOOLS step
         bottom, top = c[1] - h / 2, self.chip.get_top()[1] + TOOLS_H + 0.24
@@ -840,11 +777,10 @@ class Film(StudioScene):
 
     # --- 04 · MCP: meaning ---------------------------------------------------------------------------------------
     def a4_semantic_layer(self):
-        band = neon(self.band_shape, CYAN, 2, fill=ManimColor("#021B21"))
-        label = VGroup(L("MCP", 20, CYAN, spacing=6), L("MODEL CONTEXT PROTOCOL", 8, CYAN, spacing=1))
-        label.arrange(DOWN, buff=0.06).move_to([-5.75, BAND_Y, 0])
+        band = self.mcp.frame()
+        label = self.mcp.label.move_to([-5.75, BAND_Y, 0])
         # the question finds its answer: the band turns green… then becomes the MCP
-        green = neon(self.band_shape, GREEN, 2, fill=ManimColor("#03200F"))
+        green = self.mcp.frame(GREEN, ManimColor("#03200F"))
         self.sens_sub.set_z_index(3)
         label.set_z_index(3)
         self.play(FadeOut(self.band_ph), FadeIn(green), self.sens_sub.animate.set_color(GREEN),
@@ -946,11 +882,11 @@ class Film(StudioScene):
         # same question, new attempt: the conversation continues in the chat (like a real chat)
         alt = 0
         first = self.reply
-        q2 = self.chat_bubble(QUESTION)
-        q2.move_to([self.chat_win.get_right()[0] - 0.2, first.get_bottom()[1] - 0.14, 0], aligned_edge=UR)
+        q2 = Chat.bubble(tr(QUESTION))
+        q2.move_to([self.user.win.get_right()[0] - 0.2, first.get_bottom()[1] - 0.14, 0], aligned_edge=UR)
         wrong = self.chat_reply(tr("0.74 M"), f"{tr('ON-STREET SESSIONS')} · 09/26", color=ORANGE)
-        wrong.move_to([self.chat_win.get_left()[0] + 0.2, q2.get_bottom()[1] - 0.14, 0], aligned_edge=UL)
-        top = self.chat_win.get_top()[1]
+        wrong.move_to([self.user.win.get_left()[0] + 0.2, q2.get_bottom()[1] - 0.14, 0], aligned_edge=UL)
+        top = self.user.win.get_top()[1]
         tall = RoundedRectangle(corner_radius=0.14, width=CHAT_W, height=top - wrong.get_bottom()[1] + 0.18)
         tall.move_to([CHAT_C[0], top, 0], aligned_edge=UP)
         win2 = neon(tall, ICE, 1.6, fill=BODY).set_z_index(3)
@@ -958,7 +894,7 @@ class Film(StudioScene):
         self.play(Transform(self.user[0], win2),
                   dim([self.badge], 0),
                   first.animate.set_opacity(0.45),
-                  self.q_box.animate.set_opacity(0.45), self.question.animate.set_opacity(0.45), run_time=0.4)
+                  self.user.q_box.animate.set_opacity(0.45), self.question.animate.set_opacity(0.45), run_time=0.4)
         self.badge.next_to(win2, UP, 0.16).align_to(win2, LEFT).shift(RIGHT * 0.1)
         self.play(FadeIn(q2[0], shift=LEFT * 0.1), dim([self.badge], 1), run_time=0.25)
         with self.exact():
@@ -985,7 +921,7 @@ class Film(StudioScene):
                   self.nodes[alt][0].animate.set_stroke(color=ORANGE), run_time=0.8)
         self.play(FadeIn(wrong, shift=UP * 0.1), run_time=0.4)
         # same question, two answers: ≠
-        x = self.chat_win.get_right()[0] + 0.14
+        x = self.user.win.get_right()[0] + 0.14
         y1, y2 = first.get_y(), wrong.get_y()
         bracket = VMobject().set_points_as_corners([[x - 0.1, y1, 0], [x, y1, 0], [x, y2, 0], [x - 0.1, y2, 0]])
         bracket.set_stroke(RED, 1.6)
@@ -1000,21 +936,13 @@ class Film(StudioScene):
                   used[0].animate.set_stroke(DIMC, 1.5), self.nodes[alt][0].animate.set_stroke(color=CYAN),
                   occ[0].animate.set_stroke(color=CYAN), run_time=0.5)
         # the MCP is explained: the tables (and the public / private boundary) condense into one DATA rectangle
-        dbox = RoundedRectangle(corner_radius=0.12, width=self.band_shape.width, height=0.8).move_to([0, DATA_Y, 0])
-        data = VGroup(neon(dbox, CYAN, 1.6, fill=BODY), L("DATA", 12, CYAN, spacing=6).move_to(dbox))
+        dbox, data = data_block(self.band_shape.width, [0, DATA_Y, 0], tr("DATA"))
         self.play(ReplacementTransform(self.tables, data), FadeOut(self.roots), FadeOut(self.vault), run_time=0.8)
         self.tables, self.roots, self.vault, self.data_box = VGroup(data), VGroup(), VGroup(), dbox
         self.reply, self.lit_ok, self.lit = wrong, VGroup(lit[0], lit[1]), VGroup(VGroup(), VGroup())
         self.p4_grid, self.p4_call, self.p4_alt = grid, call2, alt
         self.chat_extra = VGroup(first, q2, bracket, neq)
         self.mini = VGroup(panel, grid, VGroup(call2, steps[1][1]))
-
-    def chat_bubble(self, text):
-        """Question bubble (right side of the chat), text ready to be typed."""
-        txt = L(text, 10, ICE, spacing=2)
-        box = RoundedRectangle(corner_radius=0.1, width=txt.width + 0.36, height=txt.height + 0.24)
-        box.set_fill(ManimColor("#0B2730"), 1).set_stroke(width=0)
-        return VGroup(box, txt.move_to(box)).set_z_index(4)
 
     def llm_sends(self, chip_m, target, color):
         """The AI sends its choice: the pill leaves the chip, follows the line to the panel and lands."""
@@ -1028,13 +956,7 @@ class Film(StudioScene):
 
     def panel_frame(self, text, icon, color, h=2.9):
         """Shared frame of the right-hand panels (act 03: no map · act 04: tool call · act 05: tools)."""
-        w = 2.7
-        left = ANS_IN[0]
-        box = RoundedRectangle(corner_radius=0.12, width=w, height=h).move_to([left + w / 2, OUT_Y - 0.4, 0])
-        frame = neon(box, color, 1.6, fill=BODY)
-        title = VGroup(icon, L(text, 9, color, spacing=4))
-        title.arrange(RIGHT, buff=0.12).move_to(box.get_corner(UL) + np.array([0.18, -0.24, 0]), aligned_edge=LEFT)
-        return box, frame, title.set_z_index(3)
+        return panel_frame(ANS_IN[0], OUT_Y - 0.4, tr(text), icon, color, h=h)
 
     def table_panel(self):
         """Act 03: the 10 raw tables the chip picks from at random."""
@@ -1114,12 +1036,10 @@ class Film(StudioScene):
 
     def chat_reply(self, main, sub, color=CYAN):
         """AI answer in the chat window, left-aligned below the question."""
-        txt = VGroup(Text(main, font=TITLE, font_size=20, color=color), L(sub, 7, color, spacing=1))
-        txt.arrange(DOWN, buff=0.06, aligned_edge=LEFT)
-        box = RoundedRectangle(corner_radius=0.1, width=txt.width + 0.36, height=txt.height + 0.24)
-        box.set_fill(BODY, 1).set_stroke(color, 1.2, 0.9)
-        pos = self.chat_win.get_corner(UL) + np.array([0.2, -1.0, 0])
-        return VGroup(box, txt.move_to(box)).move_to(pos, aligned_edge=UL).set_z_index(4)
+        return self.user.reply(main, tr(sub), color)
+
+    def badge_text(self, k):
+        return " · ".join(tr(x) for x in USER_CTX[k])
 
 
     # --- 05 · Harness: the code becomes a frame around the chip ---------------------------------------------------
@@ -1143,11 +1063,8 @@ class Film(StudioScene):
                 self.log_top = jp.get_corner(UL) + [0.18, -0.5, 0]
                 self.logs = VGroup()
                 continue
-            sq = RoundedRectangle(corner_radius=0.06, width=0.6, height=0.6).move_to(pos)
-            lbl = L(name, 8, ORANGE, spacing=2).next_to(sq, side, 0.1)
-            num = VGroup()   # no more step numbers
-            self.gates.add(VGroup(neon(sq, ORANGE, 1.6, fill=BODY), icon(ORANGE).scale(0.85).move_to(sq), lbl, num))
-        frame = neon(self.box_shape, ORANGE, 2)
+            self.gates.add(Module(icon(ORANGE), pos, tr(name), side))
+        frame = harness_frame(self.box_shape)
         box = self.box_shape
         # title in the top-right corner of the screen, above harness.py
         title_x = (box.get_right()[0] + 0.25 + FW / 2 - 0.2) / 2
@@ -1158,9 +1075,10 @@ class Film(StudioScene):
                   ReplacementTransform(pan[0], strip[0]), FadeTransform(pan[1], strip[1]),
                   *[ReplacementTransform(g, s_) for g, s_ in zip(grid4, strip[2])], FadeOut(calls), run_time=1.2)
         self.strip = strip
-        self.code = self.code_file()
+        self.code = CodeFile(self.box_shape.get_right()[0] + 0.25, FW / 2 - 0.2, OUT_Y - 0.15, RUN_LINES,
+                             tr("harness.py"))
         bgs = self.code[3]
-        self.code_lines.set_opacity(0)   # the code is not readable yet: it shows as a "matrix" while the tests run
+        self.code.lines.set_opacity(0)   # the code is not readable yet: it shows as a "matrix" while the tests run
         bgs.set_opacity(0)
         self.play(LaggedStart(*[FadeIn(g, scale=0.85) for g in self.gates], lag_ratio=0.15),
                   FadeIn(self.code, shift=LEFT * 0.15), run_time=0.7)
@@ -1180,7 +1098,7 @@ class Film(StudioScene):
         def matrix_line(i, k):  # a "matrix" line as long as instruction i
             txt = "".join(rng.choice(list("01")) if ch != " " else " " for ch in RUN_LINES[i])
             m = Text(txt, font=MONO, font_size=10, color=GREEN).set_opacity(0.55 + 0.4 * ((k + i) % 2))
-            return m.move_to(self.code_lines[i], aligned_edge=LEFT)
+            return m.move_to(self.code.lines[i], aligned_edge=LEFT)
 
         matrix = always_redraw(lambda: VGroup(*[matrix_line(i, int(t.get_value())) for i in range(len(RUN_LINES))]))
         self.add(matrix, count)
@@ -1189,23 +1107,18 @@ class Film(StudioScene):
         matrix.clear_updaters()
         tests = VGroup(tl, count)
         # tests passed: the matrix resolves into function names
-        targets = self.code_lines.copy().set_opacity(1)
+        targets = self.code.lines.copy().set_opacity(1)
         with self.exact():  # quick pass: the matrix resolves while the counter settles
             self.play(*[FadeTransform(m, c_) for m, c_ in zip(matrix, targets)],
                       tests.animate.scale(0.5).move_to(fbox.get_corner(UR) + np.array([-0.16, -0.18, 0]), aligned_edge=UR),
                       FadeOut(bg), run_time=0.45)
         self.remove(*targets)
-        self.code_lines.set_opacity(1)
+        self.code.lines.set_opacity(1)
         bgs.set_fill(opacity=0.85)
         self.tests = tests
 
         # the harness locks: input, output and data access
-        L_, R_, B_ = box.get_left()[0], box.get_right()[0], box.get_bottom()[1]
-        clamps = VGroup(
-            RoundedRectangle(corner_radius=0.03, width=0.12, height=0.46).move_to([L_, OUT_Y, 0]),
-            RoundedRectangle(corner_radius=0.03, width=0.12, height=0.46).move_to([R_, OUT_Y, 0]),
-            RoundedRectangle(corner_radius=0.03, width=0.46, height=0.12).move_to([CHIP_POS[0], B_, 0]),
-        ).set_fill(ORANGE, 1).set_stroke(width=0)
+        clamps = harness_clamps(box, OUT_Y, CHIP_POS[0])
         self.play(LaggedStart(*[GrowFromCenter(c) for c in clamps], lag_ratio=0.2),
                   Flash(frame, color=ORANGE, flash_radius=3.2, num_lines=16), run_time=0.8)
         self.hold(0.5)
@@ -1241,54 +1154,9 @@ class Film(StudioScene):
             fx = [Broadcast(Circle(0.28, color=GREEN, stroke_width=2), focal_point=c, n_mobs=2)]
         elif k == 2 and ok:  # rights: the padlock opens
             fx = [g[1].animate(rate_func=there_and_back).shift(UP * 0.07)]
-        anims = self.code_step(GATE_LINE[k]) if hasattr(self, "code_lines") else []
+        anims = self.code.step(GATE_LINE[k]) if hasattr(self, "code") else []
         return [*self.gate_state(g, GREEN if ok else RED), *fx, *anims]
 
-
-    def code_file(self):
-        """harness.py right of the harness: scrolling binary, and the instructions running live."""
-        left = self.box_shape.get_right()[0] + 0.25
-        w, h = FW / 2 - 0.2 - left, 2.7
-        box = RoundedRectangle(corner_radius=0.1, width=w, height=h).move_to([left + w / 2, OUT_Y - 0.15, 0])
-        frame = neon(box, ORANGE, 1.4, fill=BODY)
-        head = T_("harness.py", font=MONO, font_size=11, color=ORANGE)
-        head.move_to(box.get_corner(UL) + np.array([0.16, -0.18, 0]), aligned_edge=UL)
-        rng = np.random.default_rng(11)
-        y_top, y_bot = box.get_top()[1] - 0.42, box.get_bottom()[1] + 0.12
-        n = 12
-        step = (y_top - y_bot) / n
-        binary = VGroup(*[Text(" ".join(str(int(b)) for b in rng.integers(0, 2, 26)), font=MONO, font_size=7,
-                               color=ORANGE).set_opacity(0.16) for _ in range(n)])
-        for i, r in enumerate(binary):
-            r.move_to([box.get_x(), y_top - i * step, 0])
-
-        def scroll(m, dt):  # the binary scrolls up in a loop
-            for r in m:
-                r.shift(UP * dt * 0.35)
-                if r.get_y() > y_top:
-                    r.shift(DOWN * step * n)
-        binary.add_updater(scroll)
-        lines = VGroup(*[Text(t, font=MONO, font_size=10, color=ICE) for t in RUN_LINES])
-        lines.arrange(DOWN, buff=0.17, aligned_edge=LEFT)
-        lines.move_to(box.get_corner(UL) + np.array([0.38, -0.5, 0]), aligned_edge=UL)
-        bgs = VGroup(*[BackgroundRectangle(l_, color=BODY, fill_opacity=0.85, buff=0.03) for l_ in lines])
-        cursor = Text("▸", font=MONO, font_size=10, color=ORANGE).next_to(lines[0], LEFT, 0.1).set_opacity(0)
-        self.code_lines, self.code_cursor, self.code_on = lines, cursor, None
-        return VGroup(frame, binary, head, bgs, lines, cursor)
-
-    def code_step(self, i):
-        """Line i runs: it lights up, the previous one turns green."""
-        anims = []
-        if self.code_on is not None and self.code_on != i:
-            anims.append(self.code_lines[self.code_on].animate.set_color(GREEN))
-        anims += [self.code_lines[i].animate.set_color(ORANGE),
-                  self.code_cursor.animate.set_opacity(1).next_to(self.code_lines[i], LEFT, 0.1)]
-        self.code_on = i
-        return anims
-
-    def code_reset(self):
-        self.code_on = None
-        return [*[l_.animate.set_color(ICE) for l_ in self.code_lines], self.code_cursor.animate.set_opacity(0)]
 
     def ask_format(self):
         """The question enters the harness: FORMAT checks it before it reaches the chip."""
@@ -1303,7 +1171,7 @@ class Film(StudioScene):
         """Question → chip → checked tool call → MCP → chip → checked answer → user."""
         if ask:
             self.ask_format()
-            self.play(*self.code_step(1), Flash(self.strip[2][SEL], color=ORANGE, flash_radius=0.5), run_time=0.35)
+            self.play(*self.code.step(1), Flash(self.strip[2][SEL], color=ORANGE, flash_radius=0.5), run_time=0.35)
         p = packet(CYAN)
         top = self.chip.port(DOWN)
         g1, g2 = self.gates[1][0].get_center(), self.gates[2][0].get_center()
@@ -1318,7 +1186,7 @@ class Film(StudioScene):
         # the call reaches the MCP: the semantic layer lights up (the rails stay subtle)
         paths = [self.bus, self.trunk, self.lit, self.roots]
         rest = [m for m in self.background if all(m is not p_ for p_ in paths)]
-        self.play(dim(rest, 1.0), dim(paths, 0.45), *self.code_step(4), run_time=0.35)
+        self.play(dim(rest, 1.0), dim(paths, 0.45), *self.code.step(4), run_time=0.35)
         send(self, p, path, CYAN, run_time=0.6)
         self.play(Flash(node, color=CYAN, flash_radius=0.8), run_time=0.35)
         # the MCP fetches the data, then goes back up
@@ -1339,17 +1207,17 @@ class Film(StudioScene):
         # harness TOOLS step, above the chip: it extracts the question's context, then checks the tools
         alt = self.p4_alt
         # new conversation: the chat empties and shrinks back, the same question is asked to the harness
-        old = VGroup(self.chat_extra[:2], self.reply, self.q_box, self.question)
+        old = VGroup(self.chat_extra[:2], self.reply, self.user.q_box, self.question)
         self.play(old.animate.shift(UP * 0.3).set_opacity(0),
-                  Transform(self.user[0], neon(self.chat_win, ICE, 1.6, fill=BODY).set_z_index(3)),
-                  self.badge.animate.next_to(self.chat_win, DOWN, 0.16).align_to(self.chat_win, LEFT).shift(RIGHT * 0.1),
+                  Transform(self.user[0], neon(self.user.win, ICE, 1.6, fill=BODY).set_z_index(3)),
+                  self.badge.animate.next_to(self.user.win, DOWN, 0.16).align_to(self.user.win, LEFT).shift(RIGHT * 0.1),
                   self.nodes[alt][0].animate.set_stroke(color=CYAN), FadeOut(self.lit[0]),
                   run_time=0.5)
         self.remove(old)
-        self.q_box = None
-        self.play(*self.code_reset(), run_time=0.2)
+        self.user.q_box = None
+        self.play(*self.code.reset(), run_time=0.2)
         # the director's question, with no zone: the harness has to derive it from their rights
-        self.question = self.doc_to_question(QUESTION_ME)
+        self.question = self.user.type_question(self, tr(QUESTION_ME))
         self.ask_format()
         frame, title, grid, box = self.strip
         for g in grid:
@@ -1368,7 +1236,7 @@ class Film(StudioScene):
         descs.set_z_index(7)
         # the harness checks the MCP tools and their descriptions
         self.play(LaggedStart(*[FadeIn(d, shift=DOWN * 0.04) for d in descs], lag_ratio=0.08), run_time=0.6)
-        self.play(*self.code_step(1), run_time=0.25)
+        self.play(*self.code.step(1), run_time=0.25)
         # with the descriptions, the AI picks the right tool straight away
         scan = SurroundingRectangle(VGroup(grid[SEL], descs[SEL]), color=ORANGE, buff=0.03, corner_radius=0.05,
                                     stroke_width=1.6).set_z_index(8)
@@ -1399,12 +1267,8 @@ class Film(StudioScene):
         chip, old = self.chip, self.box_shape
         cx = chip.get_x()
 
-        def module(icon, pos):
-            sq = RoundedRectangle(corner_radius=0.06, width=0.6, height=0.6).move_to(pos)
-            return VGroup(neon(sq, ORANGE, 1.6, fill=BODY), icon.scale(0.85).move_to(pos), VGroup(), VGroup())
-
-        tools_m = module(icon_list(ORANGE).scale(1.3), [cx, chip.get_top()[1] + 0.5, 0])
-        log_m = module(icon_log(ORANGE), [chip.get_right()[0] + 0.6, OUT_Y, 0])
+        tools_m = Module(icon_list(ORANGE).scale(1.3), [cx, chip.get_top()[1] + 0.5, 0])
+        log_m = Module(icon_log(ORANGE), [chip.get_right()[0] + 0.6, OUT_Y, 0])
         left, right = old.get_left()[0], log_m.get_right()[0] + 0.4
         top, bottom = chip.get_top()[1] + 0.65, old.get_bottom()[1]   # no more TOOLS step in the frame
         box = RoundedRectangle(corner_radius=0.18, width=right - left, height=top - bottom)
@@ -1422,8 +1286,7 @@ class Film(StudioScene):
                           for i in range(3)]).set_stroke(CYAN, 1.6).set_fill(BODY, 1)
         mcp_lbl = self.band_label.copy().move_to(band)
         # the data: one plain big rectangle
-        db_box = RoundedRectangle(corner_radius=0.12, width=right - left, height=0.8).move_to([mid, DATA_Y, 0])
-        db = VGroup(neon(db_box, CYAN, 1.6, fill=BODY), L("DATA", 12, CYAN, spacing=6).move_to(db_box))
+        db_box, db = data_block(right - left, [mid, DATA_Y, 0], tr("DATA"))
         trunk = rail([chip.port(DOWN), [chip.port(DOWN)[0], band.get_top()[1], 0]], CYAN, 2).set_stroke(opacity=0.5)
         link = rail([band.get_bottom(), db.get_top() + UP * 0.05], CYAN, 1.6).set_stroke(opacity=0.5)
         L_, R_ = box.get_left()[0], box.get_right()[0]
@@ -1441,40 +1304,15 @@ class Film(StudioScene):
         self.tools_icon, self.tag, self.condensed = VGroup(), tag, True
         self.hold(1.0)
 
-    def user_badge(self, k):
-        """User identity, below the chat: pictogram + the first k items of their context."""
-        head = Circle(0.055).set_stroke(ICE, 1.4)
-        body = Arc(radius=0.11, start_angle=0, angle=PI).set_stroke(ICE, 1.4)
-        icon = VGroup(head, body.next_to(head, DOWN, 0.02).flip(RIGHT))
-        badge = VGroup(icon, self.badge_text(k)).arrange(RIGHT, buff=0.14)
-        bg = BackgroundRectangle(badge, color=BLACK, fill_opacity=1, buff=0.06)
-        badge.add_to_back(bg)
-        badge = VGroup(icon, badge[2], bg)   # [0] pictogram, [1] text, [2] background (drawn underneath)
-        badge.next_to(self.user[0], DOWN, 0.16).align_to(self.user[0], LEFT).shift(RIGHT * 0.1)
-        icon.set_z_index(5)
-        badge[1].set_z_index(5)
-        bg.set_z_index(3)
-        return badge
-
-    def badge_text(self, k):
-        return L(" · ".join(tr(x) for x in USER_CTX[k]), 9, ICE, spacing=3)
-
-    def badge_grow(self, k, color=ICE):
-        """The user's context gains an item (the new one lights up briefly)."""
-        new = self.badge_text(k).set_color(color).next_to(self.badge[0], RIGHT, 0.14).set_z_index(5)
-        bg = BackgroundRectangle(VGroup(self.badge[0], new), color=BLACK, fill_opacity=1, buff=0.06).set_z_index(3)
-        return [Transform(self.badge[1], new), Transform(self.badge[2], bg)]
-
-
     def scope_lookup(self, badge):
         """SCOPE calls for the user's scope; the zone comes back and attaches to the module."""
         g = self.gates[1][0]
-        x = (self.box_shape.get_left()[0] + self.chat_win.get_right()[0]) / 2
+        x = (self.box_shape.get_left()[0] + self.user.win.get_right()[0]) / 2
         route = [g.get_left(), [x, g.get_y(), 0], [x, badge.get_y(), 0], badge.get_right() + RIGHT * 0.08]
         q = packet(ORANGE)
         send(self, q, route, ORANGE, run_time=0.6)
         self.play(FadeOut(q), Flash(badge[0], color=ORANGE, flash_radius=0.35, num_lines=8),
-                  *self.badge_grow(2), run_time=0.5)
+                  *self.badge.grow(self.badge_text(2)), run_time=0.5)
         txt = L("WEST ZONE", 8, ORANGE, spacing=2)
         box = RoundedRectangle(corner_radius=0.06, width=txt.width + 0.22, height=0.24)
         pill = VGroup(box.set_fill(BODY, 1).set_stroke(ORANGE, 1.2, 1), txt.move_to(box)).set_z_index(8)

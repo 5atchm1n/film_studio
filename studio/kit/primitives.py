@@ -32,6 +32,9 @@ def label(text, size=20, color=ICE, spacing=4, font=LABEL):
                       color=color)
 
 
+NEON_OPS = (0.03, 0.07, 0.16, 1.0)  # opacities of the 3 halo layers + core
+
+
 def neon(m, color, width=2.5, fill=None):
     """Refined neon: thin stroke, discreet halo."""
     w = width * 0.6
