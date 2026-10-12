@@ -8,7 +8,7 @@ from .primitives import BODY, ICE, label, neon
 
 # --- The chip ---------------------------------------------------------------------------------------
 class Chip(VGroup):
-    def __init__(self, size=1.5, color=ICE, label_text="IA"):
+    def __init__(self, size=1.5, color=ICE, label_text="AI"):
         super().__init__()
         self.size, self.color = size, color
         body = RoundedRectangle(corner_radius=0.12, width=size, height=size)

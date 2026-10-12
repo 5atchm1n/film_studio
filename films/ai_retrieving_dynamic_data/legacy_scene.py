@@ -11,7 +11,7 @@ Architecture shown:
     tool call (scope, rights) before running it through the MCP, then checks the
     answer (format) and traces everything (audit log).
 
-On-screen text is written in French and translated through `EN` (FILM_LANG=en, the default).
+On-screen text is written in English; `FR` holds the French version (FILM_LANG=fr).
 
     studio act ai_retrieving_dynamic_data harness   # one act, 480p draft + loop page
     studio dev ai_retrieving_dynamic_data           # whole film, 480p draft
@@ -27,6 +27,7 @@ from manim import *
 
 from studio.kit import primitives as kit
 from studio.kit.actors import Chip
+from studio.kit.i18n import Translator, current_lang
 from studio.kit.primitives import (BODY, CYAN, DIMC, GREEN, ICE, LABEL, MONO, ORANGE, RED, TITLE, flash_along, globe,
                                    icon_check, icon_doc, icon_format, icon_list, icon_lock, icon_log, icon_mail,
                                    icon_scope, icon_sheet, icon_tool_card, icon_user, neon, rack, rail, square_dot)
@@ -35,53 +36,51 @@ FW = config.frame_width
 HERE = Path(__file__).resolve().parent
 OUT = Path(os.environ.get("FILM_OUT", HERE))  # where chapters.json / meta.json are written
 
-# --- Language: FILM_LANG=en (default) or fr. On-screen text is written in French and translated here. -----
-LANG = os.environ.get("FILM_LANG", "en")
-EN = {
-    "IA - Récupérer des données dynamiques": "AI - Retrieving dynamic data", "01 · L'IA": "01 · THE AI",
-    "02 · NOTRE RÉALITÉ": "02 · OUR REALITY", "03 · LE PROBLÈME": "03 · THE PROBLEM",
-    "04 · QUE VEULENT DIRE NOS DONNÉES ?": "04 · WHAT DOES OUR DATA MEAN?",
-    "Que veulent dire nos données ?": "What does our data mean?",
-    "05 · HARNESS → LA CONFIANCE": "05 · HARNESS → TRUST", "06 · ENSEMBLE": "06 · TOGETHER",
-    "L'IA générale": "General AI", "Notre réalité": "Our reality", "Le problème": "The problem",
-    "Harness : la confiance": "Harness: trust", "Ensemble": "Together", "IA": "AI", "LIVRES": "BOOKS",
-    "DONNÉES PUBLIQUES": "PUBLIC DATA", "RÉDIGE UN MAIL CLIENT": "WRITE A CLIENT EMAIL", "E-MAIL PRÊT": "EMAIL READY",
-    "RÉSUME UN CONTRAT": "SUMMARISE A CONTRACT", "5 POINTS CLÉS": "5 KEY POINTS",
-    "ÉCRIS UNE FORMULE EXCEL": "WRITE AN EXCEL FORMULA", "FORMULE": "FORMULA", "IA GÉNÉRALE": "GENERAL AI",
-    "RAPIDE · POLYVALENTE": "FAST · VERSATILE", "NOS PARKINGS · PARIS ?": "OUR CAR PARKS · PARIS?",
-    "INTERNET": "INTERNET", "MÉMOIRE": "MEMORY", "SOURCE : WEB": "SOURCE: WEB", "PARIS": "PARIS", "FRANCE": "FRANCE",
-    "MONDE": "WORLD", "DES DIZAINES": "TENS", "DES CENTAINES": "HUNDREDS", "DES MILLIERS": "THOUSANDS",
-    "DE PARKINGS": "OF CAR PARKS", "DES MILLIONS": "MILLIONS", "DES DIZAINES DE MILLIONS": "TENS OF MILLIONS",
-    "D'ÉVÉNEMENTS / JOUR": "OF EVENTS / DAY", "DES To": "TERABYTES", "DES CENTAINES DE To": "HUNDREDS OF TB",
-    "DES Po": "PETABYTES", "STOCKÉS": "STORED", "BASES DE DONNÉES": "DATABASES", "CAPTEURS": "SENSORS",
-    "BILLETTERIE": "TICKETING", "ABONNEMENTS": "SUBSCRIPTIONS", "RÉFÉRENTIEL": "MASTER DATA",
-    "DES DIZAINES DE SYSTÈMES · DES CENTAINES DE TABLES": "DOZENS OF SYSTEMS · HUNDREDS OF TABLES",
-    "PUBLIC": "PUBLIC", "PRIVÉ": "PRIVATE", "STATIONNEMENTS · PARIS · SEPT. ?": "PARKING SESSIONS · PARIS · SEPT.?",
-    "ACCÈS DIRECT AUX TABLES": "DIRECT ACCESS TO TABLES", "AMBIGUË": "AMBIGUOUS",
-    "4 DÉFINITIONS → 4 RÉPONSES": "4 DEFINITIONS → 4 ANSWERS", "PARKINGS": "CAR PARKS", "+ VOIRIE": "+ STREET",
-    "SANS DOUBLONS": "NO DUPLICATES", "AVEC DOUBLONS": "WITH DUPLICATES", "1,12 M": "1.12 M", "1,48 M": "1.48 M",
-    "1,86 M": "1.86 M", "2,41 M": "2.41 M", "COUCHE SÉMANTIQUE": "SEMANTIC LAYER", "APPEL D'OUTIL": "TOOL CALL",
-    "TABLEAUX": "TABLES", "GRAPHIQUES": "CHARTS", "RAPPORTS": "REPORTS",
-    "MIEUX COMPRENDRE LES DONNÉES": "UNDERSTAND THE DATA BETTER",
-    "RÉCUPÉRER DES DONNÉES DYNAMIQUES": "RETRIEVING DYNAMIC DATA", "COMPRÉHENSION": "UNDERSTANDING",
-    "DONNÉES": "DATA", "DIRECTEUR": "DIRECTOR", "UTILISATEUR": "USER",
-    "STATIONNEMENTS · SEPT. ?": "PARKING SESSIONS · SEPT.?", "ZONE OUEST": "WEST ZONE", "0,31 M": "0.31 M",
-    "HORS VOIRIE · ZONE OUEST · 09/26": "OFF-STREET · WEST ZONE · 09/26",
-    "09:14 sessions · ouest OK": "09:14 sessions · west OK", "OUTILS": "TOOLS", "0,74 M": "0.74 M",
-    "PAR DÉFAUT · PARKINGS": "DEFAULT · CAR PARKS", "SANS CARTE": "NO MAP", "REQUÊTE DIRECTE": "DIRECT QUERY",
-    "ENVOYÉ AU MCP": "SENT TO MCP", "CONFIANCE": "TRUST",
-    "QUE VEULENT DIRE NOS DONNÉES ?": "WHAT DOES OUR DATA MEAN?", "STATIONNEMENTS": "PARKING SESSIONS",
-    "SESSIONS VOIRIE": "ON-STREET SESSIONS", "SESSIONS HORS VOIRIE": "OFF-STREET SESSIONS", "ZONES": "ZONES",
-    "PARKINGS · SANS DOUBLONS": "CAR PARKS · NO DUPLICATES",
-    "PARKINGS · SANS DOUBLONS · 09/26": "CAR PARKS · NO DUPLICATES · 09/26", "sessions()": "sessions()",
-    "occupation()": "occupancy()", "capacite()": "capacity()", "contrats()": "contracts()",
-    "clients()": "customers()", "perimetre()": "scope()", "tarifs()": "pricing()", "PÉRIMÈTRE": "SCOPE",
-    "DROITS": "RIGHTS", "journal.log": "audit.log",
+# --- Language: FILM_LANG=en (default) or fr. On-screen text is written in English; FR holds the French. --
+LANG = current_lang()
+FR = {  # English source text → French
+    "AI - Retrieving dynamic data": "IA - Récupérer des données dynamiques", "01 · THE AI": "01 · L'IA",
+    "02 · OUR REALITY": "02 · NOTRE RÉALITÉ", "03 · THE PROBLEM": "03 · LE PROBLÈME",
+    "04 · WHAT DOES OUR DATA MEAN?": "04 · QUE VEULENT DIRE NOS DONNÉES ?",
+    "What does our data mean?": "Que veulent dire nos données ?",
+    "05 · HARNESS → TRUST": "05 · HARNESS → LA CONFIANCE", "06 · TOGETHER": "06 · ENSEMBLE",
+    "General AI": "L'IA générale", "Our reality": "Notre réalité", "The problem": "Le problème",
+    "Harness: trust": "Harness : la confiance", "Together": "Ensemble", "AI": "IA", "BOOKS": "LIVRES",
+    "PUBLIC DATA": "DONNÉES PUBLIQUES", "WRITE A CLIENT EMAIL": "RÉDIGE UN MAIL CLIENT", "EMAIL READY": "E-MAIL PRÊT",
+    "SUMMARISE A CONTRACT": "RÉSUME UN CONTRAT", "5 KEY POINTS": "5 POINTS CLÉS",
+    "WRITE AN EXCEL FORMULA": "ÉCRIS UNE FORMULE EXCEL", "FORMULA": "FORMULE", "GENERAL AI": "IA GÉNÉRALE",
+    "FAST · VERSATILE": "RAPIDE · POLYVALENTE", "OUR CAR PARKS · PARIS?": "NOS PARKINGS · PARIS ?",
+    "MEMORY": "MÉMOIRE", "SOURCE: WEB": "SOURCE : WEB", "WORLD": "MONDE", "TENS": "DES DIZAINES",
+    "HUNDREDS": "DES CENTAINES", "THOUSANDS": "DES MILLIERS", "OF CAR PARKS": "DE PARKINGS",
+    "MILLIONS": "DES MILLIONS", "TENS OF MILLIONS": "DES DIZAINES DE MILLIONS",
+    "OF EVENTS / DAY": "D'ÉVÉNEMENTS / JOUR", "TERABYTES": "DES To", "HUNDREDS OF TB": "DES CENTAINES DE To",
+    "PETABYTES": "DES Po", "STORED": "STOCKÉS", "DATABASES": "BASES DE DONNÉES", "SENSORS": "CAPTEURS",
+    "TICKETING": "BILLETTERIE", "SUBSCRIPTIONS": "ABONNEMENTS", "MASTER DATA": "RÉFÉRENTIEL",
+    "DOZENS OF SYSTEMS · HUNDREDS OF TABLES": "DES DIZAINES DE SYSTÈMES · DES CENTAINES DE TABLES",
+    "PRIVATE": "PRIVÉ", "PARKING SESSIONS · PARIS · SEPT.?": "STATIONNEMENTS · PARIS · SEPT. ?",
+    "DIRECT ACCESS TO TABLES": "ACCÈS DIRECT AUX TABLES", "AMBIGUOUS": "AMBIGUË",
+    "4 DEFINITIONS → 4 ANSWERS": "4 DÉFINITIONS → 4 RÉPONSES", "CAR PARKS": "PARKINGS", "+ STREET": "+ VOIRIE",
+    "NO DUPLICATES": "SANS DOUBLONS", "WITH DUPLICATES": "AVEC DOUBLONS", "1.12 M": "1,12 M", "1.48 M": "1,48 M",
+    "1.86 M": "1,86 M", "2.41 M": "2,41 M", "SEMANTIC LAYER": "COUCHE SÉMANTIQUE", "TOOL CALL": "APPEL D'OUTIL",
+    "TABLES": "TABLEAUX", "CHARTS": "GRAPHIQUES", "REPORTS": "RAPPORTS",
+    "UNDERSTAND THE DATA BETTER": "MIEUX COMPRENDRE LES DONNÉES",
+    "RETRIEVING DYNAMIC DATA": "RÉCUPÉRER DES DONNÉES DYNAMIQUES", "UNDERSTANDING": "COMPRÉHENSION",
+    "DATA": "DONNÉES", "DIRECTOR": "DIRECTEUR", "USER": "UTILISATEUR",
+    "PARKING SESSIONS · SEPT.?": "STATIONNEMENTS · SEPT. ?", "WEST ZONE": "ZONE OUEST", "0.31 M": "0,31 M",
+    "OFF-STREET · WEST ZONE · 09/26": "HORS VOIRIE · ZONE OUEST · 09/26",
+    "09:14 sessions · west OK": "09:14 sessions · ouest OK", "TOOLS": "OUTILS", "0.74 M": "0,74 M",
+    "DEFAULT · CAR PARKS": "PAR DÉFAUT · PARKINGS", "NO MAP": "SANS CARTE", "DIRECT QUERY": "REQUÊTE DIRECTE",
+    "SENT TO MCP": "ENVOYÉ AU MCP", "TRUST": "CONFIANCE",
+    "WHAT DOES OUR DATA MEAN?": "QUE VEULENT DIRE NOS DONNÉES ?", "PARKING SESSIONS": "STATIONNEMENTS",
+    "ON-STREET SESSIONS": "SESSIONS VOIRIE", "OFF-STREET SESSIONS": "SESSIONS HORS VOIRIE",
+    "CAR PARKS · NO DUPLICATES": "PARKINGS · SANS DOUBLONS",
+    "CAR PARKS · NO DUPLICATES · 09/26": "PARKINGS · SANS DOUBLONS · 09/26", "occupancy()": "occupation()",
+    "capacity()": "capacite()", "contracts()": "contrats()", "customers()": "clients()", "scope()": "perimetre()",
+    "pricing()": "tarifs()", "SCOPE": "PÉRIMÈTRE", "RIGHTS": "DROITS", "audit.log": "journal.log",
 }
 
 
-def tr(text):
-    return EN.get(text, text) if LANG == "en" else text
+tr = Translator(FR, LANG)
 
 
 def L(text, *a, **k):
@@ -94,29 +93,29 @@ def T_(text, **k):
 
 
 # --- Business example (illustrative figures, to be replaced by real ones) -----------------------------
-QUESTION = tr("STATIONNEMENTS · PARIS · SEPT. ?")
+QUESTION = tr("PARKING SESSIONS · PARIS · SEPT.?")
 CALL_OK = tr('stationnements("PARIS", "09/26")')
 # tree of possibilities: 2 definitions × 2 ways of counting = 4 answers
-TREE_L1 = [tr(x) for x in ["PARKINGS", "+ VOIRIE"]]
-TREE_L2 = [tr(x) for x in ["SANS DOUBLONS", "AVEC DOUBLONS"]]
-TREE_LEAVES = [tr(x) for x in ["1,12 M", "1,48 M", "1,86 M", "2,41 M"]]   # (P,no dup) (P,dup) (P+S,no dup) (P+S,dup)
+TREE_L1 = [tr(x) for x in ["CAR PARKS", "+ STREET"]]
+TREE_L2 = [tr(x) for x in ["NO DUPLICATES", "WITH DUPLICATES"]]
+TREE_LEAVES = [tr(x) for x in ["1.12 M", "1.48 M", "1.86 M", "2.41 M"]]   # (P,no dup) (P,dup) (P+S,no dup) (P+S,dup)
 TRIES = [1, 3]                                         # leaf picked at each attempt (never the right one)
 GUESSES = [TREE_LEAVES[i] for i in TRIES]
-GOOD = (tr("1,12 M"), tr("PARKINGS · SANS DOUBLONS · 09/26"))
-QUESTION_ME = tr("STATIONNEMENTS · SEPT. ?")            # no zone: the harness derives it from the user's rights
+GOOD = (tr("1.12 M"), tr("CAR PARKS · NO DUPLICATES · 09/26"))
+QUESTION_ME = tr("PARKING SESSIONS · SEPT.?")            # no zone: the harness derives it from the user's rights
 # the user's context grows act by act: 02 · 04 (with the MCP) · 05 (when SCOPE asks for it)
-USER_CTX = [["INDIGO", "UTILISATEUR"], ["INDIGO", "DIRECTEUR"], ["INDIGO", "DIRECTEUR", "ZONE OUEST"]]  # [1] unused
+USER_CTX = [["INDIGO", "USER"], ["INDIGO", "DIRECTOR"], ["INDIGO", "DIRECTOR", "WEST ZONE"]]  # [1] unused
 # Deliberately vague orders of magnitude (no precise figures until validated)
-LEVELS = ["PARIS", "FRANCE", "MONDE"]
-PARKS_MAG = ["DES DIZAINES", "DES CENTAINES", "DES MILLIERS"]
-EVENTS_MAG = ["DES MILLIERS", "DES MILLIONS", "DES DIZAINES DE MILLIONS"]
-STORAGE_MAG = ["DES To", "DES CENTAINES DE To", "DES Po"]
+LEVELS = ["PARIS", "FRANCE", "WORLD"]
+PARKS_MAG = ["TENS", "HUNDREDS", "THOUSANDS"]
+EVENTS_MAG = ["THOUSANDS", "MILLIONS", "TENS OF MILLIONS"]
+STORAGE_MAG = ["TERABYTES", "HUNDREDS OF TB", "PETABYTES"]
 RACKS = [1, 5, 12]                         # databases lit per level
-SYSTEMS = ["CAPTEURS", "BILLETTERIE", "ABONNEMENTS", "CRM", "FINANCE", "RÉFÉRENTIEL"]
+SYSTEMS = ["SENSORS", "TICKETING", "SUBSCRIPTIONS", "CRM", "FINANCE", "MASTER DATA"]
 # deliberately confusing tables: duplicates, versions, temp tables, overlapping notions
 TABLES = ["stn_evt_raw", "stn_evt_v2", "stn_v2_bkp", "stat_park_tmp", "pk_site_ref", "tkt_pass_24",
           "voirie_horod", "abo_ctr_24", "zone_idf_map", "cpt_old_2019"]
-CONCEPTS = [("SESSIONS VOIRIE", 6), ("SESSIONS HORS VOIRIE", 0), ("PARKINGS", 4), ("ABONNEMENTS", 7), ("ZONES", 8)]
+CONCEPTS = [("ON-STREET SESSIONS", 6), ("OFF-STREET SESSIONS", 0), ("CAR PARKS", 4), ("SUBSCRIPTIONS", 7), ("ZONES", 8)]
 CONCEPT_TABLES = [[6], [0, 5], [4], [7], [8]]   # tables read by each MCP domain
 TEXT_DIM = 0.6                                  # act 03: tree labels stay readable when dimmed
 BOTTOM_DIM = 0.25                               # act 03: wiring and tree dimmed while the panel is shown
@@ -127,8 +126,8 @@ GATE_LINE = {0: 0, 1: 2, 2: 3, 3: 5}               # harness module → line of 
 TOOLS_H = 1.2                                  # height of the TOOLS step, above the chip
 SEL = 1                                         # domain picked for the question (off-street = car parks)
 # each domain exposes 2 tools, each tool reads one table (almost every valid table is wired)
-TOOLS = [[("sessions()", 0), ("occupation()", 5)], [("sites()", 4), ("capacite()", 6)],
-         [("contrats()", 7), ("clients()", 7)], [("perimetre()", 8), ("tarifs()", 6)]]
+TOOLS = [[("sessions()", 0), ("occupancy()", 5)], [("sites()", 4), ("capacity()", 6)],
+         [("contracts()", 7), ("customers()", 7)], [("scope()", 8), ("pricing()", 6)]]
 LEAF_TABLES = [[0], [0, 2], [1, 6], [3, 6, 9]]   # tables read by each definition (tree leaf)
 
 # --- Diagram layout ------------------------------------------------------------------------------------
@@ -143,8 +142,8 @@ ANS_IN = ANS_POS + LEFT * 1.25
 FRAME = (np.array([0.225, 0.575, 0]), 5.55, 3.65)          # the Harness surrounds the chip
 GATES = [  # (name, icon, position, label side)  — in the order of the lines of harness.py
     ("FORMAT", icon_format, np.array([-2.55, OUT_Y, 0]), DOWN),   # on the way in, before the chip
-    ("PÉRIMÈTRE", icon_scope, np.array([-1.2, -0.25, 0]), LEFT),
-    ("DROITS", icon_lock, np.array([-1.2, -0.9, 0]), LEFT),
+    ("SCOPE", icon_scope, np.array([-1.2, -0.25, 0]), LEFT),
+    ("RIGHTS", icon_lock, np.array([-1.2, -0.9, 0]), LEFT),
     ("TRACE", icon_log, np.array([1.6, OUT_Y, 0]), DOWN),
 ]
 JOURNAL_C = np.array([1.85, OUT_Y, 0])   # the audit log lives in the harness, instead of the TRACE icon
@@ -222,7 +221,7 @@ class Film(MovingCameraScene):
                 break
         OUT.mkdir(parents=True, exist_ok=True)
         (OUT / "chapters.json").write_text(json.dumps(self.chapters, ensure_ascii=False, indent=1))
-        (OUT / "meta.json").write_text(json.dumps({"lang": LANG, "title": tr("IA - Récupérer des données dynamiques"),
+        (OUT / "meta.json").write_text(json.dumps({"lang": LANG, "title": tr("AI - Retrieving dynamic data"),
                                                    "acts": act_starts}, ensure_ascii=False))
 
     # --- Helpers -----------------------------------------------------------------------------------------
@@ -386,16 +385,16 @@ class Film(MovingCameraScene):
 
     # --- 01 · The AI: trained on the world, then general-purpose… but not on our data ---------------------------
     def a1_general_ai(self):
-        self.chapter("01 · L'IA", "L'IA générale")
+        self.chapter("01 · THE AI", "General AI")
         c = CHIP_POS
         sources = VGroup()
-        for k, name in enumerate(["WEB", "LIVRES", "WIKIS", "CODE", "ARTICLES", "FORUMS"]):
+        for k, name in enumerate(["WEB", "BOOKS", "WIKIS", "CODE", "ARTICLES", "FORUMS"]):
             col, row = divmod(k, 3)  # two lists: 3 sources on the left, 3 on the right
             pos = np.array([-4.95 if col == 0 else 2.55, c[1] + 0.8 - 0.8 * row, 0])
             lbl = L(name, 12, CYAN, spacing=4)
             box = RoundedRectangle(corner_radius=0.06, width=lbl.width + 0.4, height=0.4).move_to(pos)
             sources.add(VGroup(neon(box, CYAN, 1.2, fill=BODY), lbl.move_to(box)))
-        public = L("DONNÉES PUBLIQUES", 13, CYAN, spacing=6).move_to(c + DOWN * 2.95)
+        public = L("PUBLIC DATA", 13, CYAN, spacing=6).move_to(c + DOWN * 2.95)
         self.play(LaggedStart(*[FadeIn(s, scale=0.85) for s in sources], lag_ratio=0.15), FadeIn(public),
                   run_time=1.0)
         self.play(public.animate.set_opacity(0.3), run_time=0.3)  # dimmed until relevant
@@ -405,7 +404,7 @@ class Film(MovingCameraScene):
 
 
         # dissolve: each dot flies to a point of the chip outline, which appears where they land
-        self.chip = Chip(label_text=tr("IA")).move_to(c)
+        self.chip = Chip(label_text=tr("AI")).move_to(c)
         # circuit weaving: each source sends right-angle rails towards the chip;
         # on arrival the rails draw the outline, then the core, then the pins; the words slide
         # along their rail and melt into the chip
@@ -447,8 +446,8 @@ class Film(MovingCameraScene):
 
 
         # a general intelligence: tasks and their results grow out of the chip, along rails
-        tasks = [("RÉDIGE UN MAIL CLIENT", "E-MAIL PRÊT"), ("RÉSUME UN CONTRAT", "5 POINTS CLÉS"),
-                 ("ÉCRIS UNE FORMULE EXCEL", "FORMULE")]
+        tasks = [("WRITE A CLIENT EMAIL", "EMAIL READY"), ("SUMMARISE A CONTRACT", "5 KEY POINTS"),
+                 ("WRITE AN EXCEL FORMULA", "FORMULA")]
         chip = self.chip
         ins, outs, branches = VGroup(), VGroup(), VGroup()
         self.play(public.animate.set_opacity(0.3), run_time=0.3)
@@ -480,7 +479,7 @@ class Film(MovingCameraScene):
             self.play(lefts[k].animate.set_stroke(GREEN), rights[k].animate.set_stroke(GREEN),
                       outs[k].animate.set_color(GREEN), chip.pulse(GREEN), run_time=0.35)
         self._raw = False
-        tag = VGroup(L("IA GÉNÉRALE", 18, ICE, spacing=8), L("RAPIDE · POLYVALENTE", 11, GREY_B, spacing=4))
+        tag = VGroup(L("GENERAL AI", 18, ICE, spacing=8), L("FAST · VERSATILE", 11, GREY_B, spacing=4))
         tag.arrange(DOWN, buff=0.1).next_to(chip, UP, 0.35)
         self.play(FadeIn(tag, shift=UP * 0.1), run_time=0.35)
         self.hold(0.9)  # reading time for the use cases
@@ -492,7 +491,7 @@ class Film(MovingCameraScene):
         self.morph(VGroup(done, outs, tag, branches), VGroup(icon, in_rail, out_rail))
         user = self.make_chat()
         self.play(FadeTransform(icon, user), run_time=0.55, rate_func=rate_functions.ease_in_out_cubic)
-        q_txt = self.doc_to_question("NOS PARKINGS · PARIS ?")
+        q_txt = self.doc_to_question("OUR CAR PARKS · PARIS?")
         win = self.chat_win
         u_bub = VGroup(self.q_box, q_txt)
         q = VGroup()
@@ -505,7 +504,7 @@ class Film(MovingCameraScene):
         top = chip.port(UP)
         web_pts = [top, [top[0], 3.05, 0], web.get_left()]
         web_rail = rail(web_pts, CYAN, 1.6)
-        mem = L("MÉMOIRE", 11, CYAN, spacing=4).next_to(chip, DOWN, 0.3)
+        mem = L("MEMORY", 11, CYAN, spacing=4).next_to(chip, DOWN, 0.3)
         self.play(Create(web_rail), FadeIn(web), FadeIn(web_lbl), FadeIn(mem), chip.pulse(CYAN),
                   *self.show_pins(("UP", 0)), run_time=0.5)
         p = self.packet(CYAN)
@@ -535,7 +534,7 @@ class Film(MovingCameraScene):
             self._raw = False
             cur = nxt
         final = VGroup(Text("?", font=LABEL, font_size=32, color=ORANGE),
-                       L("SOURCE : WEB", 10, ORANGE, spacing=2)).arrange(RIGHT, buff=0.3).move_to(a_box).set_z_index(5)
+                       L("SOURCE: WEB", 10, ORANGE, spacing=2)).arrange(RIGHT, buff=0.3).move_to(a_box).set_z_index(5)
         self.play(FadeTransform(cur, final), run_time=0.45)
         guess = VGroup(u_bub, a_box, final)
         self.hold(0.5)
@@ -562,15 +561,15 @@ class Film(MovingCameraScene):
 
         self.level_lbl = L("PARIS", 18, GREY_B, spacing=10).move_to(M + [-3.6, 3.15, 0])
         self.count = self.mag_count(0)
-        self.count_lbl = L("DE PARKINGS", 14, CYAN, spacing=6).move_to(M + [2.0, 3.15, 0], aligned_edge=LEFT)
+        self.count_lbl = L("OF CAR PARKS", 14, CYAN, spacing=6).move_to(M + [2.0, 3.15, 0], aligned_edge=LEFT)
         # storage: server racks lighting up level after level
         self.racks = VGroup(*[rack().move_to(M + [4.75 + 0.52 * (i % 4), 0.85 - 1.27 * (i // 4), 0])
                               for i in range(12)])
         self.racks_on = 0
         self.ev_count, self.st_count = self.mag_events(0), self.mag_storage(0)
-        self.ev_lbl = L("D'ÉVÉNEMENTS / JOUR", 10, GREEN, spacing=3).move_to(M + [4.55, 2.45, 0], aligned_edge=LEFT)
-        self.st_lbl = L("STOCKÉS", 10, ICE, spacing=3).move_to(M + [4.55, 1.7, 0], aligned_edge=LEFT)
-        self.rack_lbl = L("BASES DE DONNÉES", 10, GREY_B, spacing=3).next_to(self.racks, DOWN, 0.12)\
+        self.ev_lbl = L("OF EVENTS / DAY", 10, GREEN, spacing=3).move_to(M + [4.55, 2.45, 0], aligned_edge=LEFT)
+        self.st_lbl = L("STORED", 10, ICE, spacing=3).move_to(M + [4.55, 1.7, 0], aligned_edge=LEFT)
+        self.rack_lbl = L("DATABASES", 10, GREY_B, spacing=3).next_to(self.racks, DOWN, 0.12)\
             .align_to(self.racks, LEFT)
         self.pv(periph, seine, parks, self.level_lbl, self.count_lbl, self.racks, self.ev_lbl, self.st_lbl,
                 self.rack_lbl)
@@ -578,10 +577,10 @@ class Film(MovingCameraScene):
         # 1 → 2: the chip stays at the top (PUBLIC); a dashed boundary opens our PRIVATE world below
         line = DashedLine([-7.1, SPLIT_Y, 0], [7.1, SPLIT_Y, 0], dash_length=0.12).set_stroke(GREY_B, 1.4)
         pub = L("PUBLIC", 11, CYAN, spacing=6).move_to([6.95, SPLIT_Y + 0.2, 0], aligned_edge=RIGHT)
-        priv = L("PRIVÉ", 11, GREY_B, spacing=6).move_to([6.95, SPLIT_Y - 0.22, 0], aligned_edge=RIGHT)
+        priv = L("PRIVATE", 11, GREY_B, spacing=6).move_to([6.95, SPLIT_Y - 0.22, 0], aligned_edge=RIGHT)
         self.play(FadeOut(self.intro_bits), Create(line), FadeTransform(self.public, pub), FadeIn(priv, shift=DOWN * 0.1),
                   run_time=1.1)
-        self.chapter("02 · NOTRE RÉALITÉ", "Notre réalité")
+        self.chapter("02 · OUR REALITY", "Our reality")
         self.frontier = VGroup(line, pub, priv)
 
         # our world unfolds: the boundary rises like a screen, the private area rolls out below
@@ -727,7 +726,7 @@ class Film(MovingCameraScene):
         for k, name in enumerate(SYSTEMS):
             box = RoundedRectangle(corner_radius=0.06, width=1.95, height=0.5).move_to(M + [-5.4 + 2.16 * k, -2.35, 0])
             systems.add(VGroup(neon(box, GREY_B, 1.2, fill=BODY), L(name, 11, GREY_B, spacing=2).move_to(box)))
-        sys_lbl = L("DES DIZAINES DE SYSTÈMES · DES CENTAINES DE TABLES", 14, GREY_B, spacing=4).next_to(systems, DOWN, 0.12)
+        sys_lbl = L("DOZENS OF SYSTEMS · HUNDREDS OF TABLES", 14, GREY_B, spacing=4).next_to(systems, DOWN, 0.12)
         self.pv(systems, sys_lbl)
         # the globe pours into the servers…
         rack_c = self.racks.get_center()
@@ -767,12 +766,12 @@ class Film(MovingCameraScene):
 
     # --- 03 · The problem: the AI wired onto the raw data ---------------------------------------------------------
     def a3_direct_access(self):
-        self.chapter("03 · LE PROBLÈME", "Le problème")
+        self.chapter("03 · THE PROBLEM", "The problem")
         self.build_wiring()
         # the question arrives… and the circuit is drawn as it goes down to the tables (direct access)
         self.question = self.doc_to_question(QUESTION)
         self.ask()
-        direct = L("ACCÈS DIRECT AUX TABLES", 12, RED, spacing=4).move_to([1.4, -0.45, 0])
+        direct = L("DIRECT ACCESS TO TABLES", 12, RED, spacing=4).move_to([1.4, -0.45, 0])
         self.play(LaggedStart(*[Create(c) for c in self.chaos], lag_ratio=0.03),
                   *self.show_pins(("DOWN", -1), ("DOWN", 1)),
                   LaggedStart(*[FadeIn(j, scale=0.5) for j in self.joints], lag_ratio=0.1),
@@ -868,7 +867,7 @@ class Film(MovingCameraScene):
         for n in (*n1, *n2):  # the tree is born dimmed, like the wiring
             self.node_style(n, DIMC, BOTTOM_DIM, animate=False)
 
-        count_txt = L("4 DÉFINITIONS → 4 RÉPONSES", 11, ORANGE, spacing=3).move_to([0.9, -1.35, 0])
+        count_txt = L("4 DEFINITIONS → 4 ANSWERS", 11, ORANGE, spacing=3).move_to([0.9, -1.35, 0])
         count = VGroup(BackgroundRectangle(count_txt, color=BLACK, fill_opacity=1, buff=0.04), count_txt)
         amb = VGroup()   # the ambiguity shows in the chat, instead of the 2nd answer
         intro = [LaggedStart(*[ReplacementTransform(self.joints[k], n) for k, n in enumerate([*n1, *n2])],
@@ -907,7 +906,7 @@ class Film(MovingCameraScene):
             self.hold(0.15)
 
         # no definition is enforced: anything is possible, so nothing is reliable
-        amb_sub = L("AMBIGUË", 12, RED, spacing=6)
+        amb_sub = L("AMBIGUOUS", 12, RED, spacing=6)
         amb_sub.next_to(self.chapter_lbl, DOWN, 0.14).align_to(self.chapter_lbl, LEFT).set_z_index(30)
         self.play(*[m.animate.set_stroke(RED, 1.6 * 0.65, BOTTOM_DIM) for m in self.chaos],
                   *[a for n in (*n1, *n2) for a in self.node_style(n, RED, BOTTOM_DIM)],
@@ -938,7 +937,7 @@ class Film(MovingCameraScene):
         box.move_to([(left + right) / 2, (top + bottom) / 2, 0])
         self.band_shape, self.box_shape = band, box
         self.band_ph = DashedVMobject(band.copy().set_stroke(GREY_B, 1.5), num_dashes=100)
-        s1 = L("COUCHE SÉMANTIQUE", 15, CYAN, spacing=8).next_to(band, UP, 0.08).align_to(band, LEFT).shift(RIGHT * 0.15)
+        s1 = L("SEMANTIC LAYER", 15, CYAN, spacing=8).next_to(band, UP, 0.08).align_to(band, LEFT).shift(RIGHT * 0.15)
         # 1 · each tree node becomes a "?"
         nodes = list(self.doubts[:6])
         qs = [Text("?", font=LABEL, font_size=24, color=RED).move_to(n) for n in nodes]
@@ -955,7 +954,7 @@ class Film(MovingCameraScene):
         self.play(FadeTransform(VGroup(*qs), s1_mid), run_time=0.6)
         self.hold(0.4)
         # 4 · … which rises to become the band title, the question takes its place
-        sub1 = L("QUE VEULENT DIRE NOS DONNÉES ?", 14, ICE, spacing=4).move_to(mid)
+        sub1 = L("WHAT DOES OUR DATA MEAN?", 14, ICE, spacing=4).move_to(mid)
         self.play(TransformFromCopy(s1_mid, sub1), ReplacementTransform(s1_mid, s1), run_time=0.8)
         self.hold(0.9)
         self.sens_sub, self.sens_lbl = sub1, s1
@@ -973,7 +972,7 @@ class Film(MovingCameraScene):
                   FadeOut(self.amb_sub), run_time=0.5)
         self.play(flash_along(self.band_shape, GREEN, 5, run_time=0.6), run_time=0.6)
         # the question rises and becomes the chapter title; the band becomes the MCP
-        self.chapter("04 · QUE VEULENT DIRE NOS DONNÉES ?", "Que veulent dire nos données ?", src=self.sens_sub,
+        self.chapter("04 · WHAT DOES OUR DATA MEAN?", "What does our data mean?", src=self.sens_sub,
                      extra=[FadeOut(green), FadeIn(band), FadeIn(label)])
         self.play(self.chaos.animate.set_stroke(opacity=0.85), run_time=0.3)
         self.play(LaggedStart(*[Flash(pt, color=WHITE, flash_radius=0.3, line_length=0.12, num_lines=8)
@@ -1070,7 +1069,7 @@ class Film(MovingCameraScene):
         first = self.reply
         q2 = self.chat_bubble(QUESTION)
         q2.move_to([self.chat_win.get_right()[0] - 0.2, first.get_bottom()[1] - 0.14, 0], aligned_edge=UR)
-        wrong = self.chat_reply(tr("0,74 M"), f"{tr('SESSIONS VOIRIE')} · 09/26", color=ORANGE)
+        wrong = self.chat_reply(tr("0.74 M"), f"{tr('ON-STREET SESSIONS')} · 09/26", color=ORANGE)
         wrong.move_to([self.chat_win.get_left()[0] + 0.2, q2.get_bottom()[1] - 0.14, 0], aligned_edge=UL)
         top = self.chat_win.get_top()[1]
         tall = RoundedRectangle(corner_radius=0.14, width=CHAT_W, height=top - wrong.get_bottom()[1] + 0.18)
@@ -1124,7 +1123,7 @@ class Film(MovingCameraScene):
                   occ[0].animate.set_stroke(color=CYAN), run_time=0.5)
         # the MCP is explained: the tables (and the public / private boundary) condense into one DATA rectangle
         dbox = RoundedRectangle(corner_radius=0.12, width=self.band_shape.width, height=0.8).move_to([0, DATA_Y, 0])
-        data = VGroup(neon(dbox, CYAN, 1.6, fill=BODY), L("DONNÉES", 12, CYAN, spacing=6).move_to(dbox))
+        data = VGroup(neon(dbox, CYAN, 1.6, fill=BODY), L("DATA", 12, CYAN, spacing=6).move_to(dbox))
         self.play(ReplacementTransform(self.tables, data), FadeOut(self.roots), FadeOut(self.vault), run_time=0.8)
         self.tables, self.roots, self.vault, self.data_box = VGroup(data), VGroup(), VGroup(), dbox
         self.reply, self.lit_ok, self.lit = wrong, VGroup(lit[0], lit[1]), VGroup(VGroup(), VGroup())
@@ -1163,7 +1162,7 @@ class Film(MovingCameraScene):
         """Act 03: the 10 raw tables the chip picks from at random."""
         die = RoundedRectangle(corner_radius=0.05, width=0.24, height=0.24).set_stroke(ORANGE, 1.4)
         die = VGroup(die, *[Dot(die.get_center() + d * 0.06, radius=0.018, color=ORANGE) for d in (UL, ORIGIN, DR)])
-        box, frame, title = self.panel_frame("SANS CARTE", die, ORANGE)
+        box, frame, title = self.panel_frame("NO MAP", die, ORANGE)
         grid = VGroup()
         for name in TABLES:
             b = RoundedRectangle(corner_radius=0.04, width=1.15, height=0.22).set_stroke(DIMC, 1.1, 1).set_fill(BODY, 1)
@@ -1181,13 +1180,13 @@ class Film(MovingCameraScene):
             b = RoundedRectangle(corner_radius=0.04, width=t.width + 0.12, height=0.2).set_stroke(ORANGE, 1, 1)
             chips.add(VGroup(b.set_fill(BODY, 1), t.move_to(b).set_z_index(2)))
         chips.arrange(RIGHT, buff=0.06)
-        lbl = L("REQUÊTE DIRECTE", 7, GREY_B, spacing=2)
+        lbl = L("DIRECT QUERY", 7, GREY_B, spacing=2)
         call = VGroup(chips, lbl).arrange(DOWN, buff=0.1)
         return call.move_to(self.p3_box.get_bottom() + UP * 0.38).set_z_index(3)
 
     def tool_panel(self):
         """Tool call panel, on the right (instead of the answer box): ① domains ② choice ③ call."""
-        box, frame, title = self.panel_frame("APPEL D'OUTIL", icon_tool_card(CYAN).scale(0.55).set_z_index(0), CYAN)
+        box, frame, title = self.panel_frame("TOOL CALL", icon_tool_card(CYAN).scale(0.55).set_z_index(0), CYAN)
         grid = self.domain_grid().move_to(box.get_center() + UP * 0.45)
         pills = VGroup(*[VGroup(RoundedRectangle(corner_radius=0.06, width=0.5, height=0.22).set_fill(CYAN, 0.18)
                                 .set_stroke(CYAN, 1, 0.8), L(t, 7, ICE, spacing=1)) for t in ("PARIS", "09/26")])
@@ -1195,7 +1194,7 @@ class Film(MovingCameraScene):
             pl[1].move_to(pl[0]).set_z_index(2)
         call = VGroup(grid[SEL].copy(), *pills).arrange(RIGHT, buff=0.06).move_to(box.get_center() + DOWN * 0.72)
         call[0][0].set_stroke(CYAN, 1.6, 1)
-        sent = L("ENVOYÉ AU MCP", 7, GREY_B, spacing=2).next_to(call, DOWN, 0.12)
+        sent = L("SENT TO MCP", 7, GREY_B, spacing=2).next_to(call, DOWN, 0.12)
         return VGroup(frame, title), [grid, VGroup(call, sent)]
 
     def tools_strip(self):
@@ -1204,7 +1203,7 @@ class Film(MovingCameraScene):
         box = RoundedRectangle(corner_radius=0.12, width=w, height=h)
         box.move_to([self.box_shape.get_x(), self.chip.get_top()[1] + 0.12 + h / 2, 0])
         frame = neon(box, ORANGE, 1.4, fill=BODY).set_z_index(6)
-        title = VGroup(icon_list(ORANGE).scale(1.2), L("OUTILS", 10, ORANGE, spacing=4)).arrange(RIGHT, buff=0.12)
+        title = VGroup(icon_list(ORANGE).scale(1.2), L("TOOLS", 10, ORANGE, spacing=4)).arrange(RIGHT, buff=0.12)
         title.move_to(box.get_corner(UL) + np.array([0.2, -0.24, 0]), aligned_edge=LEFT).set_z_index(7)
         cw = (w - 0.3 - 4 * 0.08) / 5
         grid = VGroup()
@@ -1247,7 +1246,7 @@ class Film(MovingCameraScene):
 
     # --- 05 · Harness: the code becomes a frame around the chip ---------------------------------------------------
     def a5_build_harness(self):
-        self.chapter("05 · HARNESS → LA CONFIANCE", "Harness : la confiance")
+        self.chapter("05 · HARNESS → TRUST", "Harness: trust")
         self.background = [self.band, self.band_label, self.nodes, self.bus, self.trunk, self.lit, self.roots,
                            self.tables, self.vault, self.sens_lbl]
         # inside the harness the chip gets a little smaller: one step among others
@@ -1260,7 +1259,7 @@ class Film(MovingCameraScene):
         for name, icon, pos, side in GATES:
             if name == "TRACE":  # the TRACE step is the audit log itself
                 jp = RoundedRectangle(corner_radius=0.1, width=2.75, height=1.15).move_to(JOURNAL_C)
-                jh = T_("journal.log", font=MONO, font_size=12, color=ORANGE)
+                jh = T_("audit.log", font=MONO, font_size=12, color=ORANGE)
                 jh.move_to(jp.get_corner(UL) + [0.18, -0.2, 0], aligned_edge=UL)
                 self.gates.add(VGroup(neon(jp, ORANGE, 1.6, fill=BODY), jh, VGroup(), VGroup()))
                 self.log_top = jp.get_corner(UL) + [0.18, -0.5, 0]
@@ -1482,7 +1481,7 @@ class Film(MovingCameraScene):
         descs = VGroup()
         for k, g in enumerate(grid):
             if k == SEL:
-                d = L("PAR DÉFAUT · PARKINGS", 8, ICE, spacing=1)
+                d = L("DEFAULT · CAR PARKS", 8, ICE, spacing=1)
                 if d.width > g.width - 0.08:
                     d.scale_to_fit_width(g.width - 0.08)
             else:
@@ -1503,8 +1502,8 @@ class Film(MovingCameraScene):
                   run_time=0.5)
         self.hold(0.6)
         self.play(FadeOut(VGroup(descs, scan)), descs[SEL].animate.set_color(GREY_B), run_time=0.4)
-        self.run(CALL_OK, ("09:14 sessions · ouest OK", GREEN), to_chat=True, ask=False, scope=self.badge)
-        right = self.chat_reply(tr("0,31 M"), tr("HORS VOIRIE · ZONE OUEST · 09/26"), color=GREEN)
+        self.run(CALL_OK, ("09:14 sessions · west OK", GREEN), to_chat=True, ask=False, scope=self.badge)
+        right = self.chat_reply(tr("0.31 M"), tr("OFF-STREET · WEST ZONE · 09/26"), color=GREEN)
         self.ok = icon_check(GREEN, 0.5).next_to(right, RIGHT, 0.15).set_z_index(6)
         self.play(FadeIn(right, shift=UP * 0.1), Create(self.ok), Flash(right, color=GREEN, flash_radius=1.0),
                   FadeIn(self.lit_ok.set_stroke(CYAN, opacity=1)), run_time=0.6)
@@ -1547,7 +1546,7 @@ class Film(MovingCameraScene):
         mcp_lbl = self.band_label.copy().move_to(band)
         # the data: one plain big rectangle
         db_box = RoundedRectangle(corner_radius=0.12, width=right - left, height=0.8).move_to([mid, DATA_Y, 0])
-        db = VGroup(neon(db_box, CYAN, 1.6, fill=BODY), L("DONNÉES", 12, CYAN, spacing=6).move_to(db_box))
+        db = VGroup(neon(db_box, CYAN, 1.6, fill=BODY), L("DATA", 12, CYAN, spacing=6).move_to(db_box))
         trunk = rail([chip.port(DOWN), [chip.port(DOWN)[0], band.get_top()[1], 0]], CYAN, 2).set_stroke(opacity=0.5)
         link = rail([band.get_bottom(), db.get_top() + UP * 0.05], CYAN, 1.6).set_stroke(opacity=0.5)
         L_, R_ = box.get_left()[0], box.get_right()[0]
@@ -1599,7 +1598,7 @@ class Film(MovingCameraScene):
         self.send(q, route, ORANGE, run_time=0.6)
         self.play(FadeOut(q), Flash(badge[0], color=ORANGE, flash_radius=0.35, num_lines=8),
                   *self.badge_grow(2), run_time=0.5)
-        txt = L("ZONE OUEST", 8, ORANGE, spacing=2)
+        txt = L("WEST ZONE", 8, ORANGE, spacing=2)
         box = RoundedRectangle(corner_radius=0.06, width=txt.width + 0.22, height=0.24)
         pill = VGroup(box.set_fill(BODY, 1).set_stroke(ORANGE, 1.2, 1), txt.move_to(box)).set_z_index(8)
         dest = g.get_right() + RIGHT * (0.2 + pill.width / 2)
@@ -1609,12 +1608,12 @@ class Film(MovingCameraScene):
     # --- 06 · Together -------------------------------------------------------------------------------------------
     def a6_together(self):
         """Big picture: chat → harness → MCP → data; the answer becomes tables, charts, reports."""
-        self.chapter("06 · ENSEMBLE", "Ensemble")
+        self.chapter("06 · TOGETHER", "Together")
         box, band = self.box_shape, self.band_shape
         # the harness is explained: no more detail inside, only the frame around the AI
         self.play(FadeOut(VGroup(self.gates, self.tools_icon, self.tag, self.tests)), run_time=0.6)
-        trust = L("CONFIANCE", 14, ORANGE, spacing=8).next_to(box, RIGHT, 0.3).align_to(box, DOWN)
-        sem = L("COUCHE SÉMANTIQUE", 14, CYAN, spacing=8).next_to(band, RIGHT, 0.3)
+        trust = L("TRUST", 14, ORANGE, spacing=8).next_to(box, RIGHT, 0.3).align_to(box, DOWN)
+        sem = L("SEMANTIC LAYER", 14, CYAN, spacing=8).next_to(band, RIGHT, 0.3)
         # the whole circuit lights up once, then the two key ideas flash next to their block
         self.play(flash_along(self.in_rail, WHITE, 5, run_time=0.9), flash_along(self.trunk, WHITE, 5, run_time=0.9),
                   *[flash_along(r, WHITE, 5, run_time=0.9) for r in self.roots], self.chip.pulse(), run_time=0.9)
@@ -1624,10 +1623,10 @@ class Film(MovingCameraScene):
         bars = VGroup(*[Rectangle(width=0.1, height=h).set_fill(GREEN, 0.8).set_stroke(width=0)
                         for h in (0.18, 0.32, 0.24, 0.42)]).arrange(RIGHT, buff=0.05, aligned_edge=DOWN)
         outs = VGroup()
-        for icon, name in [(icon_sheet(GREEN), "TABLEAUX"), (bars, "GRAPHIQUES"), (icon_doc(GREEN), "RAPPORTS")]:
+        for icon, name in [(icon_sheet(GREEN), "TABLES"), (bars, "CHARTS"), (icon_doc(GREEN), "REPORTS")]:
             outs.add(VGroup(icon, L(name, 9, GREEN, spacing=3)).arrange(DOWN, buff=0.15))
         outs.arrange(RIGHT, buff=0.5).move_to([(box.get_right()[0] + FW / 2) / 2 + 0.2, OUT_Y + 0.3, 0])
-        eff = L("MIEUX COMPRENDRE LES DONNÉES", 12, GREEN, spacing=4).next_to(outs, DOWN, 0.45)
+        eff = L("UNDERSTAND THE DATA BETTER", 12, GREEN, spacing=4).next_to(outs, DOWN, 0.45)
         self.play(self.reply.animate.shift(UP * 0.04), self.ok.animate.shift(UP * 0.04), run_time=0.2)
         src = self.reply.copy()
         self.play(src.animate.move_to(outs).scale(0.8), run_time=0.7)
@@ -1643,9 +1642,9 @@ class Film(MovingCameraScene):
         self.play(Flash(self.user[0], color=GREEN, flash_radius=1.9, num_lines=14), run_time=0.7)
         self.hold(1.0)
         # last shot: the rectangles disappear and become the words that sum up the film
-        w1 = L("CONFIANCE", 26, ORANGE, spacing=10)
-        w2 = L("COUCHE SÉMANTIQUE", 26, CYAN, spacing=10)
-        w3 = L("RÉCUPÉRER DES DONNÉES DYNAMIQUES", 20, WHITE, spacing=8)
+        w1 = L("TRUST", 26, ORANGE, spacing=10)
+        w2 = L("SEMANTIC LAYER", 26, CYAN, spacing=10)
+        w3 = L("RETRIEVING DYNAMIC DATA", 20, WHITE, spacing=8)
         words = VGroup(w1, w2, w3).arrange(DOWN, buff=0.55).move_to([0, 0.2, 0])
         harness = VGroup(self.frame, self.frame_label, self.clamps)
         mcp = VGroup(self.band, self.band_label)
@@ -1658,7 +1657,7 @@ class Film(MovingCameraScene):
         # the harness becomes TRUST; the MCP becomes SEMANTIC LAYER, then UNDERSTANDING
         self.play(FadeTransform(harness, w1), FadeTransform(mcp, w2), FadeOut(data, scale=0.8), run_time=1.2)
         self.hold(1.0)
-        und = L("COMPRÉHENSION", 26, CYAN, spacing=10).move_to(w2)
+        und = L("UNDERSTANDING", 26, CYAN, spacing=10).move_to(w2)
         self.play(FadeTransform(w2, und), run_time=0.9)
         self.hold(0.6)
         # and finally, underneath: retrieving dynamic data
