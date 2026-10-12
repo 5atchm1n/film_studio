@@ -23,12 +23,13 @@ from pathlib import Path
 import numpy as np
 from manim import *
 
-import film_kit as kit
-from film_kit import (BODY, CYAN, DIMC, GREEN, ICE, LABEL, MONO, ORANGE, RED, TITLE, Chip, flash_along, globe,
+import legacy_kit as kit
+from legacy_kit import (BODY, CYAN, DIMC, GREEN, ICE, LABEL, MONO, ORANGE, RED, TITLE, Chip, flash_along, globe,
                       icon_check, icon_cross, icon_format, icon_lock, icon_log, icon_scope, neon, rail)
 
 FW = config.frame_width
 HERE = Path(__file__).resolve().parent
+OUT = Path(os.environ.get("FILM_OUT", HERE))  # where chapters.json / meta.json are written
 
 # --- Langue : FILM_LANG=en (défaut) ou fr. Les textes sont écrits en français et traduits ici. ----------
 LANG = os.environ.get("FILM_LANG", "en")
@@ -257,7 +258,9 @@ class Film(MovingCameraScene):
         upto = os.environ.get("FILM_UPTO")  # FILM_UPTO=probleme : s'arrête après cet acte
         start = os.environ.get("FILM_FROM")  # FILM_FROM=probleme : les actes précédents sont calculés sans être dessinés
         names = [a[0] for a in acts]
+        act_starts = {}
         for name, slow, scenes in acts:
+            act_starts[name] = round(self.now(), 2)
             if target:
                 self.next_section(name, skip_animations=(name != target))
             elif start:
@@ -270,9 +273,10 @@ class Film(MovingCameraScene):
             if upto == name:
                 self.hold(0.8)
                 break
-        (HERE / "film_chapters.json").write_text(json.dumps(self.chapters, ensure_ascii=False, indent=1))
-        (HERE / "film_meta.json").write_text(json.dumps({"lang": LANG, "title": tr("IA - Récupérer des données dynamiques")},
-                                                        ensure_ascii=False))
+        OUT.mkdir(parents=True, exist_ok=True)
+        (OUT / "chapters.json").write_text(json.dumps(self.chapters, ensure_ascii=False, indent=1))
+        (OUT / "meta.json").write_text(json.dumps({"lang": LANG, "title": tr("IA - Récupérer des données dynamiques"),
+                                                   "acts": act_starts}, ensure_ascii=False))
 
     # --- Outils ------------------------------------------------------------------------------------------
     def play(self, *anims, **kw):
