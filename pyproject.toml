@@ -1,0 +1,21 @@
+[project]
+name = "film-studio"
+version = "0.1.0"
+description = "From a brief to a short concept video: Manim films rendered through validated gates."
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "manim==0.21.0",   # pinned until the regression tooling covers an upgrade
+  "av==19.0.1",      # PyAV: frame decoding, no ffmpeg binary needed
+  "pillow==12.3.0",
+  "numpy==2.5.4",
+]
+
+[project.scripts]
+studio = "studio.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["studio*"]

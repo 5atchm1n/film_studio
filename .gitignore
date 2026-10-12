@@ -1,0 +1,15 @@
+# Rendered outputs (regenerated with `studio`)
+out/
+media/
+*.mp4
+*.html
+!films/*/baseline/*.mp4
+
+# Python / tooling
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+build/
+.idea/
+.DS_Store
