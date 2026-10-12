@@ -1,0 +1,7 @@
+# AI - Retrieving dynamic data — the reference film, migrated from visuels_mcp_harness (legacy Manim scene).
+title = "AI - Retrieving dynamic data"
+kind = "legacy"
+scene_file = "legacy_scene.py"
+scene_class = "Film"
+acts = ["ia", "realite", "probleme", "mcp", "harness", "ensemble"]
+langs = ["en", "fr"]

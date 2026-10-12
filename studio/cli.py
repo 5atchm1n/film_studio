@@ -106,7 +106,9 @@ def cmd_baseline(args):
         if args.source:
             src = Path(args.source).resolve()
             video, chapters = regress.baseline_from_source(f, lang, src, args.scene_class)
-            source = str(src)
+            rev = subprocess.run(["git", "-C", str(src.parent), "describe", "--always", "--dirty"],
+                                 capture_output=True, text=True).stdout.strip()
+            source = f"{src}" + (f" @ {rev}" if rev else "")
         else:
             rd = render(f, f"baseline-{lang}", "dev", lang)
             video, chapters, source = rd.video, rd.chapters, f"{f.dir.name}/{f.scene_file}"
