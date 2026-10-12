@@ -26,6 +26,8 @@ from studio.kit import primitives as kit
 from studio.kit.actors import (Badge, Band, Chat, Chip, CodeFile, Module, data_block, harness_clamps, harness_frame,
                                packet, panel_frame)
 from studio.kit.i18n import Translator, current_lang
+from studio.kit.layout import (ANS_IN, BAND_Y, BUS_Y, CHAT_C, CHAT_H, CHAT_W, CHIP_POS, DATA_Y, IN_X,
+                               OUT_Y, USER_POS)
 from studio.kit.motions import dim, morph, send
 from studio.kit.scene import StudioScene
 from studio.kit.primitives import (BODY, CYAN, DIMC, GREEN, ICE, LABEL, MONO, NEON_OPS, ORANGE, RED, TITLE, flash_along, globe,
@@ -128,15 +130,7 @@ TOOLS = [[("sessions()", 0), ("occupancy()", 5)], [("sites()", 4), ("capacity()"
          [("contracts()", 7), ("customers()", 7)], [("scope()", 8), ("pricing()", 6)]]
 LEAF_TABLES = [[0], [0, 2], [1, 6], [3, 6, 9]]   # tables read by each definition (tree leaf)
 
-# --- Diagram layout ------------------------------------------------------------------------------------
-CHIP_POS = np.array([-1.2, 1.15, 0])
-OUT_Y = 1.15
-USER_POS = np.array([-6.55, OUT_Y, 0])
-CHAT_C = np.array([-4.95, OUT_Y, 0])         # the chat window (the user) left of the chip
-CHAT_W, CHAT_H = 3.4, 1.9
-IN_X = CHAT_C[0] + CHAT_W / 2                # right edge of the chat: where questions leave
-ANS_POS = np.array([5.55, OUT_Y, 0])
-ANS_IN = ANS_POS + LEFT * 1.25
+# --- Diagram layout (standard anchors in studio.kit.layout; film-specific positions here) ----------------
 FRAME = (np.array([0.225, 0.575, 0]), 5.55, 3.65)          # the Harness surrounds the chip
 GATES = [  # (name, icon, position, label side)  — in the order of the lines of harness.py
     ("FORMAT", icon_format, np.array([-2.55, OUT_Y, 0]), DOWN),   # on the way in, before the chip
@@ -145,9 +139,6 @@ GATES = [  # (name, icon, position, label side)  — in the order of the lines o
     ("TRACE", icon_log, np.array([1.6, OUT_Y, 0]), DOWN),
 ]
 JOURNAL_C = np.array([1.85, OUT_Y, 0])   # the audit log lives in the harness, instead of the TRACE icon
-BUS_Y = -1.3
-BAND_Y = -2.05
-DATA_Y = -3.35
 TABLE_XS = list(np.linspace(-6.1, 6.1, 10))
 J1_POS = [np.array([-3.6, -0.95, 0]), np.array([3.0, -0.95, 0])]   # branch CAR PARKS / + STREET
 J2_DX, J2_Y = 1.3, -1.85                                            # branch NO / WITH DUPLICATES
