@@ -1,8 +1,7 @@
-"""Briques visuelles TRON du film : couleurs, polices, néon, pistes, icônes, puce.
+"""TRON building blocks of the legacy film: colours, fonts, neon, rails, icons, chip.
 
-Extrait de tron.py (génération 2) : seules les pièces réellement utilisées par film.py,
-avec les réglages « affinés » du film (néon fin, pistes à 65 % de l'épaisseur nominale).
-Aucune dépendance à manim-slides, story.py ou presentation.py.
+Extracted from tron.py (generation 2): only the pieces film.py really uses, with the film's "refined" settings
+(thin neon, rails at 65 % of the nominal width). No dependency on manim-slides, story.py or presentation.py.
 """
 
 import numpy as np
@@ -10,30 +9,30 @@ from manim import *
 
 config.background_color = "#000000"
 
-# --- Couleurs ------------------------------------------------------------------------------------
-CYAN = ManimColor("#00E5FF")      # MCP · le sens
-ICE = ManimColor("#CFF8FF")       # IA, textes
-ORANGE = ManimColor("#FF9E1B")    # Harness · la confiance
-RED = ManimColor("#FF3355")       # erreur, refus
-GREEN = ManimColor("#2BFF88")     # validé
-DIMC = ManimColor("#1D3A44")      # pistes éteintes
-BODY = ManimColor("#020A0F")      # fond des blocs
+# --- Colours -------------------------------------------------------------------------------------
+CYAN = ManimColor("#00E5FF")      # MCP · meaning
+ICE = ManimColor("#CFF8FF")       # AI, text
+ORANGE = ManimColor("#FF9E1B")    # Harness · trust
+RED = ManimColor("#FF3355")       # error, refusal
+GREEN = ManimColor("#2BFF88")     # validated
+DIMC = ManimColor("#1D3A44")      # unlit rails
+BODY = ManimColor("#020A0F")      # block fill
 
-# --- Polices --------------------------------------------------------------------------------------
+# --- Fonts ----------------------------------------------------------------------------------------
 LABEL = "DIN Alternate"
 TITLE = "Futura"
 MONO = "Menlo"
 
 
 def label(text, size=20, color=ICE, spacing=4, font=LABEL):
-    """Libellé en capitales espacées."""
+    """Label in spaced capitals."""
     text = text.replace("&", "&amp;")
     return MarkupText(f'<span letter_spacing="{int(spacing * 180)}">{text}</span>', font=font, font_size=size,
                       color=color)
 
 
 def neon(m, color, width=2.5, fill=None):
-    """Néon affiné : trait fin, halo discret."""
+    """Refined neon: thin stroke, discreet halo."""
     w = width * 0.6
     glow = VGroup(*[m.copy().set_fill(opacity=0).set_stroke(color, w * k, opacity=op)
                     for k, op in ((5, 0.03), (2.8, 0.07), (1.7, 0.16))])
@@ -44,16 +43,16 @@ def neon(m, color, width=2.5, fill=None):
 
 
 def rail(points, color=DIMC, width=2):
-    """Piste de circuit (polyligne à angles droits)."""
+    """Circuit rail (right-angle polyline)."""
     return VMobject().set_points_as_corners([np.array(p, dtype=float) for p in points]).set_stroke(color, width * 0.65)
 
 
 def flash_along(path, color, width=5, time_width=0.35, run_time=0.9):
-    """Éclair lumineux qui parcourt une piste."""
+    """Flash of light running along a rail."""
     return ShowPassingFlash(path.copy().set_stroke(color, width * 0.65), time_width=time_width, run_time=run_time)
 
 
-# --- Icônes ----------------------------------------------------------------------------------------
+# --- Icons -----------------------------------------------------------------------------------------
 def icon_format(c):
     return Text("{ }", font=MONO, font_size=26, color=c)
 
@@ -89,7 +88,7 @@ def globe(r, c):
     return g.set_stroke(c, 2)
 
 
-# --- La puce ----------------------------------------------------------------------------------------
+# --- The chip --------------------------------------------------------------------------------------
 class Chip(VGroup):
     def __init__(self, size=1.5, color=ICE, label_text="IA"):
         super().__init__()
@@ -98,7 +97,7 @@ class Chip(VGroup):
         die = RoundedRectangle(corner_radius=0.06, width=size * 0.56, height=size * 0.56)
         pins = VGroup()
         for d in (UP, DOWN, LEFT, RIGHT):
-            n = d[[1, 0, 2]] * np.array([1, 1, 0])  # direction le long du côté
+            n = d[[1, 0, 2]] * np.array([1, 1, 0])  # direction along the side
             for k in range(-2, 3):
                 base = d * size / 2 + n * k * size * 0.17
                 pins.add(Line(base, base + d * 0.16))

@@ -3,5 +3,5 @@ title = "AI - Retrieving dynamic data"
 kind = "legacy"
 scene_file = "legacy_scene.py"
 scene_class = "Film"
-acts = ["ia", "realite", "probleme", "mcp", "harness", "ensemble"]
+acts = ["ai", "reality", "problem", "mcp", "harness", "together"]
 langs = ["en", "fr"]
