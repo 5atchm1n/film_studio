@@ -25,9 +25,11 @@ from pathlib import Path
 import numpy as np
 from manim import *
 
-import legacy_kit as kit
-from legacy_kit import (BODY, CYAN, DIMC, GREEN, ICE, LABEL, MONO, ORANGE, RED, TITLE, Chip, flash_along, globe,
-                      icon_check, icon_cross, icon_format, icon_lock, icon_log, icon_scope, neon, rail)
+from studio.kit import primitives as kit
+from studio.kit.actors import Chip
+from studio.kit.primitives import (BODY, CYAN, DIMC, GREEN, ICE, LABEL, MONO, ORANGE, RED, TITLE, flash_along, globe,
+                                   icon_check, icon_doc, icon_format, icon_list, icon_lock, icon_log, icon_mail,
+                                   icon_scope, icon_sheet, icon_tool_card, icon_user, neon, rack, rail, square_dot)
 
 FW = config.frame_width
 HERE = Path(__file__).resolve().parent
@@ -180,60 +182,7 @@ def ll(lon, lat, k, c, center=MC):
     return center + np.array([(lon - c[0]) * COS * k, (lat - c[1]) * k, 0])
 
 
-def user_icon(c):
-    head = Circle(0.15).set_stroke(c, 2.5)
-    body = Arc(radius=0.28, start_angle=0, angle=PI).set_stroke(c, 2.5).next_to(head, DOWN, buff=0.06)
-    return VGroup(head, body)
-
-
-def icon_mail(c):
-    env = Rectangle(width=0.5, height=0.34).set_stroke(c, 2)
-    flap = VMobject().set_points_as_corners([env.get_corner(UL), env.get_center() + DOWN * 0.04, env.get_corner(UR)])
-    return VGroup(env, flap.set_stroke(c, 2))
-
-
-def icon_doc(c):
-    page = Rectangle(width=0.34, height=0.44).set_stroke(c, 2)
-    lines = VGroup(*[Line(LEFT * 0.1, RIGHT * 0.1).shift(UP * (0.1 - 0.1 * i)) for i in range(3)]).set_stroke(c, 1.6)
-    return VGroup(page, lines.move_to(page))
-
-
-def icon_sheet(c):
-    grid = VGroup(Rectangle(width=0.46, height=0.36),
-                  *[Line([-0.23, y, 0], [0.23, y, 0]) for y in (-0.06, 0.06)],
-                  *[Line([x, -0.18, 0], [x, 0.18, 0]) for x in (-0.08, 0.08)])
-    return grid.set_stroke(c, 1.8)
-
-
 TASK_ICONS = [icon_mail, icon_doc, icon_sheet]
-
-
-def tool_card(color=CYAN):
-    """Tool call as a visual: a mini card with a tool pictogram and two parameter pills."""
-    box = RoundedRectangle(corner_radius=0.06, width=0.78, height=0.4)
-    gear = VGroup(Circle(0.07), *[Line(UP * 0.09, UP * 0.13).rotate(a, about_point=ORIGIN) for a in np.arange(0, TAU, TAU / 6)])
-    gear.set_stroke(color, 1.6).move_to(box.get_left() + RIGHT * 0.19)
-    pills = VGroup(*[RoundedRectangle(corner_radius=0.04, width=0.17, height=0.09).set_fill(color, 0.9)
-                     .set_stroke(width=0) for _ in range(2)]).arrange(DOWN, buff=0.05).move_to(box.get_center() + RIGHT * 0.15)
-    card = VGroup(neon(box, color, 1.4, fill=BODY), gear, pills)
-    return card.set_z_index(9)
-
-
-def icon_list(c):
-    return VGroup(*[VGroup(Dot(radius=0.025), Line(ORIGIN, RIGHT * 0.22).shift(RIGHT * 0.06))
-                    .shift(DOWN * 0.08 * i) for i in range(3)]).set_color(c).set_stroke(c, 1.6).center()
-
-
-def make_rack():
-    body = RoundedRectangle(corner_radius=0.04, width=0.42, height=1.12)
-    slots = VGroup(*[Line([-0.14, 0.42 - 0.17 * i, 0], [0.07, 0.42 - 0.17 * i, 0]) for i in range(6)])
-    leds = VGroup(*[Dot([0.13, 0.42 - 0.17 * i, 0], radius=0.024) for i in range(6)])
-    return VGroup(neon(body, DIMC, 1.2, fill=BODY), slots.set_stroke(DIMC, 1.2),
-                  leds.set_fill(DIMC, 1).set_stroke(width=0))
-
-
-def dot(p, color=CYAN, s=0.075):
-    return Square(s).set_fill(color, 1).set_stroke(width=0).move_to(p)
 
 
 class Film(MovingCameraScene):
@@ -537,7 +486,7 @@ class Film(MovingCameraScene):
         self.hold(0.9)  # reading time for the use cases
         done = ins
         # … then a question about OUR business: the user becomes a chat window
-        icon = user_icon(ICE).move_to(USER_POS)
+        icon = icon_user(ICE).move_to(USER_POS)
         in_rail = rail([[IN_X, OUT_Y, 0], chip.port(LEFT)], DIMC, 2)
         out_rail = rail([chip.port(RIGHT), ANS_IN], DIMC, 2)
         self.morph(VGroup(done, outs, tag, branches), VGroup(icon, in_rail, out_rail))
@@ -615,7 +564,7 @@ class Film(MovingCameraScene):
         self.count = self.mag_count(0)
         self.count_lbl = L("DE PARKINGS", 14, CYAN, spacing=6).move_to(M + [2.0, 3.15, 0], aligned_edge=LEFT)
         # storage: server racks lighting up level after level
-        self.racks = VGroup(*[make_rack().move_to(M + [4.75 + 0.52 * (i % 4), 0.85 - 1.27 * (i // 4), 0])
+        self.racks = VGroup(*[rack().move_to(M + [4.75 + 0.52 * (i % 4), 0.85 - 1.27 * (i // 4), 0])
                               for i in range(12)])
         self.racks_on = 0
         self.ev_count, self.st_count = self.mag_events(0), self.mag_storage(0)
@@ -750,7 +699,7 @@ class Film(MovingCameraScene):
         paris_pt = self.pp(ll(2.35, 48.85, FR_K, FR_C))
         france = neon(VMobject().set_points_as_corners([ll(lo, la, FR_K, FR_C) for lo, la in FRANCE]),
                       ManimColor("#1B5C69"), 2)
-        fr_dots = VGroup(*[dot(ll(lo, la, FR_K, FR_C) + rng.normal(0, 0.09, 3) * [1, 1, 0])
+        fr_dots = VGroup(*[square_dot(ll(lo, la, FR_K, FR_C) + rng.normal(0, 0.09, 3) * [1, 1, 0])
                            for lo, la, n in FR_CITIES for _ in range(n)])
         self.pv(france, fr_dots)
         # one gesture: data goes to the servers while Paris folds into France
@@ -763,7 +712,7 @@ class Film(MovingCameraScene):
         R = 2.3
         world = neon(globe(R, ManimColor("#1B5C69")).move_to(MC), ManimColor("#1B5C69"), 1.6)
         eu_pt = self.pp(MC + np.array([0.26 * R, 0.53 * R, 0]))
-        w_dots = VGroup(*[dot(MC + np.array([u * R, v * R, 0]), CYAN, 0.07) for u, v in WORLD_DOTS])
+        w_dots = VGroup(*[square_dot(MC + np.array([u * R, v * R, 0]), CYAN, 0.07) for u, v in WORLD_DOTS])
         self.pv(world, w_dots)
         # same gesture: France settles onto the globe while its data joins the servers
         self.play(*self.to_servers(fr_dots, 32, seed=2),
@@ -1238,7 +1187,7 @@ class Film(MovingCameraScene):
 
     def tool_panel(self):
         """Tool call panel, on the right (instead of the answer box): ① domains ② choice ③ call."""
-        box, frame, title = self.panel_frame("APPEL D'OUTIL", tool_card(CYAN).scale(0.55).set_z_index(0), CYAN)
+        box, frame, title = self.panel_frame("APPEL D'OUTIL", icon_tool_card(CYAN).scale(0.55).set_z_index(0), CYAN)
         grid = self.domain_grid().move_to(box.get_center() + UP * 0.45)
         pills = VGroup(*[VGroup(RoundedRectangle(corner_radius=0.06, width=0.5, height=0.22).set_fill(CYAN, 0.18)
                                 .set_stroke(CYAN, 1, 0.8), L(t, 7, ICE, spacing=1)) for t in ("PARIS", "09/26")])

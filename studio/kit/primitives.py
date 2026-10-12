@@ -1,7 +1,8 @@
-"""TRON building blocks of the legacy film: colours, fonts, neon, rails, icons, chip.
+"""Primitives: colours, fonts, neon, rails, flashes, icons — the minimal TRON vocabulary.
 
-Extracted from tron.py (generation 2): only the pieces film.py really uses, with the film's "refined" settings
-(thin neon, rails at 65 % of the nominal width). No dependency on manim-slides, story.py or presentation.py.
+Every film builds from these. Colours carry meaning: cyan = meaning / MCP, orange = trust / harness,
+ice = AI & text, red = error, green = validated, dim teal = unlit rails.
+Fonts are macOS system fonts (DIN Alternate, Futura, Menlo).
 """
 
 import numpy as np
@@ -88,30 +89,56 @@ def globe(r, c):
     return g.set_stroke(c, 2)
 
 
-# --- The chip --------------------------------------------------------------------------------------
-class Chip(VGroup):
-    def __init__(self, size=1.5, color=ICE, label_text="IA"):
-        super().__init__()
-        self.size, self.color = size, color
-        body = RoundedRectangle(corner_radius=0.12, width=size, height=size)
-        die = RoundedRectangle(corner_radius=0.06, width=size * 0.56, height=size * 0.56)
-        pins = VGroup()
-        for d in (UP, DOWN, LEFT, RIGHT):
-            n = d[[1, 0, 2]] * np.array([1, 1, 0])  # direction along the side
-            for k in range(-2, 3):
-                base = d * size / 2 + n * k * size * 0.17
-                pins.add(Line(base, base + d * 0.16))
-        wires = VGroup(*[Line(die.get_corner(v), body.get_corner(v) - v * 0.18) for v in (UL, UR, DL, DR)])
-        self.body = neon(body, color, 2.5, fill=BODY)
-        self.die = neon(die, color, 1.5)
-        self.pins = neon(pins, color, 2)
-        self.wires = wires.set_stroke(color, 1.2, opacity=0.6)
-        self.label = label(label_text, int(size * 17), color, spacing=3).move_to(body)
-        self.add(self.pins, self.body, self.wires, self.die, self.label)
+def icon_user(c):
+    head = Circle(0.15).set_stroke(c, 2.5)
+    body = Arc(radius=0.28, start_angle=0, angle=PI).set_stroke(c, 2.5).next_to(head, DOWN, buff=0.06)
+    return VGroup(head, body)
 
-    def pulse(self, color=WHITE):
-        edge = self.body[1].copy().set_fill(opacity=0)
-        return ShowPassingFlash(edge.set_stroke(color, 6), time_width=0.5, run_time=1.0)
 
-    def port(self, d):
-        return self.body.get_center() + d * (self.size / 2 + 0.16)
+def icon_mail(c):
+    env = Rectangle(width=0.5, height=0.34).set_stroke(c, 2)
+    flap = VMobject().set_points_as_corners([env.get_corner(UL), env.get_center() + DOWN * 0.04, env.get_corner(UR)])
+    return VGroup(env, flap.set_stroke(c, 2))
+
+
+def icon_doc(c):
+    page = Rectangle(width=0.34, height=0.44).set_stroke(c, 2)
+    lines = VGroup(*[Line(LEFT * 0.1, RIGHT * 0.1).shift(UP * (0.1 - 0.1 * i)) for i in range(3)]).set_stroke(c, 1.6)
+    return VGroup(page, lines.move_to(page))
+
+
+def icon_sheet(c):
+    grid = VGroup(Rectangle(width=0.46, height=0.36),
+                  *[Line([-0.23, y, 0], [0.23, y, 0]) for y in (-0.06, 0.06)],
+                  *[Line([x, -0.18, 0], [x, 0.18, 0]) for x in (-0.08, 0.08)])
+    return grid.set_stroke(c, 1.8)
+
+
+def icon_list(c):
+    return VGroup(*[VGroup(Dot(radius=0.025), Line(ORIGIN, RIGHT * 0.22).shift(RIGHT * 0.06))
+                    .shift(DOWN * 0.08 * i) for i in range(3)]).set_color(c).set_stroke(c, 1.6).center()
+
+
+def icon_tool_card(color=CYAN):
+    """Tool call as a visual: a mini card with a tool pictogram and two parameter pills."""
+    box = RoundedRectangle(corner_radius=0.06, width=0.78, height=0.4)
+    gear = VGroup(Circle(0.07), *[Line(UP * 0.09, UP * 0.13).rotate(a, about_point=ORIGIN) for a in np.arange(0, TAU, TAU / 6)])
+    gear.set_stroke(color, 1.6).move_to(box.get_left() + RIGHT * 0.19)
+    pills = VGroup(*[RoundedRectangle(corner_radius=0.04, width=0.17, height=0.09).set_fill(color, 0.9)
+                     .set_stroke(width=0) for _ in range(2)]).arrange(DOWN, buff=0.05).move_to(box.get_center() + RIGHT * 0.15)
+    card = VGroup(neon(box, color, 1.4, fill=BODY), gear, pills)
+    return card.set_z_index(9)
+
+
+def rack():
+    """Server rack (unlit): body, slots, LEDs."""
+    body = RoundedRectangle(corner_radius=0.04, width=0.42, height=1.12)
+    slots = VGroup(*[Line([-0.14, 0.42 - 0.17 * i, 0], [0.07, 0.42 - 0.17 * i, 0]) for i in range(6)])
+    leds = VGroup(*[Dot([0.13, 0.42 - 0.17 * i, 0], radius=0.024) for i in range(6)])
+    return VGroup(neon(body, DIMC, 1.2, fill=BODY), slots.set_stroke(DIMC, 1.2),
+                  leds.set_fill(DIMC, 1).set_stroke(width=0))
+
+
+def square_dot(p, color=CYAN, s=0.075):
+    """Small filled square (data point on a map)."""
+    return Square(s).set_fill(color, 1).set_stroke(width=0).move_to(p)
