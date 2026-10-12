@@ -33,3 +33,11 @@ class Chip(VGroup):
 
     def port(self, d):
         return self.body.get_center() + d * (self.size / 2 + 0.16)
+
+
+# --- Packet ------------------------------------------------------------------------------------------
+def packet(color=ICE):
+    """Data packet: a bright square in a soft halo (travels along rails with motions.send)."""
+    p = VGroup(Square(0.12).set_fill(color, 1).set_stroke(width=0),
+               Square(0.24).set_fill(color, 0.15).set_stroke(width=0))
+    return p.set_z_index(8)

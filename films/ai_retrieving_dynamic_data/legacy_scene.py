@@ -18,23 +18,20 @@ On-screen text is written in English; `FR` holds the French version (FILM_LANG=f
     studio final ai_retrieving_dynamic_data --validated
 """
 
-import json
-import os
-from pathlib import Path
 
 import numpy as np
 from manim import *
 
 from studio.kit import primitives as kit
-from studio.kit.actors import Chip
+from studio.kit.actors import Chip, packet
 from studio.kit.i18n import Translator, current_lang
+from studio.kit.motions import dim, morph, send
+from studio.kit.scene import StudioScene
 from studio.kit.primitives import (BODY, CYAN, DIMC, GREEN, ICE, LABEL, MONO, ORANGE, RED, TITLE, flash_along, globe,
                                    icon_check, icon_doc, icon_format, icon_list, icon_lock, icon_log, icon_mail,
                                    icon_scope, icon_sheet, icon_tool_card, icon_user, neon, rack, rail, square_dot)
 
 FW = config.frame_width
-HERE = Path(__file__).resolve().parent
-OUT = Path(os.environ.get("FILM_OUT", HERE))  # where chapters.json / meta.json are written
 
 # --- Language: FILM_LANG=en (default) or fr. On-screen text is written in English; FR holds the French. --
 LANG = current_lang()
@@ -184,133 +181,18 @@ def ll(lon, lat, k, c, center=MC):
 TASK_ICONS = [icon_mail, icon_doc, icon_sheet]
 
 
-class Film(MovingCameraScene):
-    slow = 1.0        # slow-motion factor (introduction)
-    MIN_RT = 0.5      # minimum animation duration (avoids abrupt pops)
-    _raw = False      # True while packets move (exact durations)
-
+class Film(StudioScene):
+    translate = staticmethod(tr)
 
     def construct(self):
-        self.chapters = []
-        self.chapter_lbl = None
-        acts = [  # (name, slow-motion, scenes)
-            ("ai", 1.0, [self.a1_general_ai]),
-            ("reality", 1.0, [self.a2_our_data, self.a2_zoom_out]),
-            ("problem", 1.0, [self.a3_direct_access, self.a3_random_guesses, self.a3_ambiguity]),
-            ("mcp", 1.0, [self.a4_semantic_layer]),
-            ("harness", 1.0, [self.a5_build_harness, self.a5_scoped_question, self.a5_condense]),
-            ("together", 1.0, [self.a6_together]),
-        ]
-        # Partial drafts (studio act / range): earlier acts are computed but not drawn.
-        names = [a[0] for a in acts]
-        upto = os.environ.get("FILM_UPTO")  # FILM_UPTO=problem: stop after this act
-        start = os.environ.get("FILM_FROM")  # FILM_FROM=problem: earlier acts are computed but not drawn
-        for act in (upto, start):
-            if act and act not in names:
-                raise ValueError(f"Unknown act: {act} (acts: {', '.join(names)})")
-        act_starts = {}
-        for name, slow, scenes in acts:
-            act_starts[name] = round(self.now(), 2)
-            if start:
-                self.next_section(name, skip_animations=names.index(name) < names.index(start))
-            self.slow = slow
-            for scene in scenes:
-                scene()
-            if upto == name:
-                self.hold(0.8)
-                break
-        OUT.mkdir(parents=True, exist_ok=True)
-        (OUT / "chapters.json").write_text(json.dumps(self.chapters, ensure_ascii=False, indent=1))
-        (OUT / "meta.json").write_text(json.dumps({"lang": LANG, "title": tr("AI - Retrieving dynamic data"),
-                                                   "acts": act_starts}, ensure_ascii=False))
-
-    # --- Helpers -----------------------------------------------------------------------------------------
-    def play(self, *anims, **kw):
-        rt = kw.get("run_time")
-        if rt is None:
-            rt = max([a.run_time for a in anims if isinstance(a, Animation)] or [1.0])
-        if not self._raw and 0.1 < rt < self.MIN_RT:  # jolts (< 0.1 s) and packets are exempt
-            rt = self.MIN_RT
-        kw["run_time"] = rt * self.slow
-        super().play(*anims, **kw)
-
-    def wait(self, duration=1.0, *args, **kw):
-        super().wait(duration * self.slow, *args, **kw)
-
-    def hold(self, t=0.6):
-        self.wait(t)
-
-    def morph(self, old, new, *extra, run_time=0.8):
-        """What leaves turns into what arrives (3Blue1Brown-style morph), element by element:
-        each old element is paired with a new one; extra elements fade out in place."""
-        olds = [m for g in old for m in (g if isinstance(g, VGroup) and not hasattr(g, "text") and len(g) > 2
-                                           and all(isinstance(x, VGroup) for x in g) else [g])]
-        news = [m for g in new for m in (g if isinstance(g, VGroup) and not hasattr(g, "text") and len(g) > 2
-                                           and all(isinstance(x, VGroup) for x in g) else [g])]
-        anims, n = [], min(len(olds), len(news))
-        for o, w in zip(olds[:n], news[:n]):
-            anims.append(FadeTransform(o, w, path_arc=-PI / 12))
-        anims += [FadeOut(o, scale=0.9) for o in olds[n:]] + [FadeIn(w, scale=0.9) for w in news[n:]]
-        self.play(*anims, *extra, run_time=run_time, rate_func=rate_functions.ease_in_out_cubic)
-
-    def now(self):
-        return float(self.renderer.time)
-
-    def packet(self, color=ICE):
-        p = VGroup(Square(0.12).set_fill(color, 1).set_stroke(width=0),
-                   Square(0.24).set_fill(color, 0.15).set_stroke(width=0))
-        return p.set_z_index(8)
-
-    def send(self, packet, points, color, run_time=1.0):
-        path = rail(points)
-        packet.move_to(points[0])
-        trail = TracedPath(packet.get_center, stroke_color=color, stroke_width=3, dissipating_time=0.35)
-        trail.set_z_index(7)
-        self.add(trail, packet)
-        self._raw = True
-        self.play(MoveAlongPath(packet, path), run_time=run_time, rate_func=rate_functions.ease_in_out_sine)
-        self._raw = False
-        self.remove(trail)
-
-    def dim(self, mobs, factor):
-        """Dim (or restore, factor=1) a group while respecting each layer's own opacity."""
-        fam = [m for mob in mobs for m in mob.family_members_with_points()]
-        for m in fam:
-            if not hasattr(m, "_base_op"):
-                m._base_op = (m.get_stroke_opacity(), m.get_fill_opacity())
-        start = [(m.get_stroke_opacity(), m.get_fill_opacity()) for m in fam]
-        end = [(b[0] * factor, b[1] * factor) for b in (m._base_op for m in fam)]
-
-        def update(_, a):
-            for m, (s0, f0), (s1, f1) in zip(fam, start, end):
-                m.set_stroke(opacity=s0 + (s1 - s0) * a, family=False)
-                m.set_fill(opacity=f0 + (f1 - f0) * a, family=False)
-
-        return UpdateFromAlphaFunc(Mobject(), update)
-
-    def chapter(self, text, toc=None, src=None, extra=()):
-        """Small chapter label, pinned top-left of the camera frame."""
-        self.chapters.append([round(self.now(), 2), tr(toc or text)])
-        frame = self.camera.frame
-        new = L(text, 14, GREY_B, spacing=6).set_z_index(30)
-        h0 = new.height
-
-        def stick(m):
-            s = frame.width / FW
-            m.scale_to_fit_height(h0 * s)
-            m.move_to(frame.get_corner(UL) + np.array([0.45, -0.4, 0]) * s, aligned_edge=UL)
-
-        stick(new)
-        new.add_updater(stick)
-        if src is not None:  # an element of the scene rises and becomes the chapter title
-            self.play(FadeOut(self.chapter_lbl, shift=LEFT * 0.1), FadeTransform(src, new), *extra, run_time=0.8)
-        elif self.chapter_lbl is None:
-            self.play(FadeIn(new, shift=RIGHT * 0.15), run_time=0.5)
-        else:  # the old title fades before the new one appears
-            self.play(LaggedStart(FadeOut(self.chapter_lbl, shift=LEFT * 0.1), FadeIn(new, shift=RIGHT * 0.15),
-                                  lag_ratio=0.7), run_time=0.7)
-        self.chapter_lbl = new
-
+        self.run_acts([
+            ("ai", [self.a1_general_ai]),
+            ("reality", [self.a2_our_data, self.a2_zoom_out]),
+            ("problem", [self.a3_direct_access, self.a3_random_guesses, self.a3_ambiguity]),
+            ("mcp", [self.a4_semantic_layer]),
+            ("harness", [self.a5_build_harness, self.a5_scoped_question, self.a5_condense]),
+            ("together", [self.a6_together]),
+        ], "AI - Retrieving dynamic data")
 
     PIN_SIDES = {"UP": 0, "DOWN": 1, "LEFT": 2, "RIGHT": 3}
     PIN_OPS = (0.03, 0.07, 0.16, 1.0)  # opacities of the 3 halos + core (see neon)
@@ -364,9 +246,8 @@ class Film(MovingCameraScene):
         if self.q_box is not None:
             anims.append(FadeOut(self.q_box))
         self.play(*anims, run_time=0.3)
-        self._raw = True
-        self.play(AddTextLetterByLetter(txt, time_per_char=0.02), run_time=0.5)
-        self._raw = False
+        with self.exact():
+            self.play(AddTextLetterByLetter(txt, time_per_char=0.02), run_time=0.5)
         self.q_box = box
         return txt
 
@@ -379,8 +260,8 @@ class Film(MovingCameraScene):
         return q.move_to(self.chat_bubble_pos(), aligned_edge=UR)
 
     def ask(self, color=ICE, run_time=0.6):
-        p = self.packet(color)
-        self.send(p, [[IN_X, OUT_Y, 0], self.chip.port(LEFT)], color, run_time=run_time)
+        p = packet(color)
+        send(self, p, [[IN_X, OUT_Y, 0], self.chip.port(LEFT)], color, run_time=run_time)
         self.play(self.chip.pulse(), FadeOut(p), run_time=0.45)
 
     # --- 01 · The AI: trained on the world, then general-purpose… but not on our data ---------------------------
@@ -474,11 +355,10 @@ class Film(MovingCameraScene):
                   *[ReplacementTransform(trs[k], lefts[k]) for k in range(3)],
                   *[ReplacementTransform(trs[3 + k], rights[k]) for k in range(3)],
                   run_time=0.9, rate_func=rate_functions.ease_in_out_cubic)
-        self._raw = True
-        for k in range(3):  # each example runs through the circuit: the rail and the result turn green (match)
-            self.play(lefts[k].animate.set_stroke(GREEN), rights[k].animate.set_stroke(GREEN),
-                      outs[k].animate.set_color(GREEN), chip.pulse(GREEN), run_time=0.35)
-        self._raw = False
+        with self.exact():
+            for k in range(3):  # each example runs through the circuit: the rail and the result turn green (match)
+                self.play(lefts[k].animate.set_stroke(GREEN), rights[k].animate.set_stroke(GREEN),
+                          outs[k].animate.set_color(GREEN), chip.pulse(GREEN), run_time=0.35)
         tag = VGroup(L("GENERAL AI", 18, ICE, spacing=8), L("FAST · VERSATILE", 11, GREY_B, spacing=4))
         tag.arrange(DOWN, buff=0.1).next_to(chip, UP, 0.35)
         self.play(FadeIn(tag, shift=UP * 0.1), run_time=0.35)
@@ -488,7 +368,7 @@ class Film(MovingCameraScene):
         icon = icon_user(ICE).move_to(USER_POS)
         in_rail = rail([[IN_X, OUT_Y, 0], chip.port(LEFT)], DIMC, 2)
         out_rail = rail([chip.port(RIGHT), ANS_IN], DIMC, 2)
-        self.morph(VGroup(done, outs, tag, branches), VGroup(icon, in_rail, out_rail))
+        morph(self, VGroup(done, outs, tag, branches), VGroup(icon, in_rail, out_rail))
         user = self.make_chat()
         self.play(FadeTransform(icon, user), run_time=0.55, rate_func=rate_functions.ease_in_out_cubic)
         q_txt = self.doc_to_question("OUR CAR PARKS · PARIS?")
@@ -496,8 +376,8 @@ class Film(MovingCameraScene):
         u_bub = VGroup(self.q_box, q_txt)
         q = VGroup()
         # the question goes from the chat to the chip
-        p = self.packet(ICE)
-        self.send(p, [[IN_X, OUT_Y, 0], chip.port(LEFT)], ICE, run_time=0.4)
+        p = packet(ICE)
+        send(self, p, [[IN_X, OUT_Y, 0], chip.port(LEFT)], ICE, run_time=0.4)
         self.play(chip.pulse(), FadeOut(p), run_time=0.35)
         web = neon(globe(0.42, CYAN).move_to([2.2, 3.05, 0]), CYAN, 1.6)
         web_lbl = L("INTERNET", 11, CYAN, spacing=4).next_to(web, RIGHT, 0.2)
@@ -507,14 +387,14 @@ class Film(MovingCameraScene):
         mem = L("MEMORY", 11, CYAN, spacing=4).next_to(chip, DOWN, 0.3)
         self.play(Create(web_rail), FadeIn(web), FadeIn(web_lbl), FadeIn(mem), chip.pulse(CYAN),
                   *self.show_pins(("UP", 0)), run_time=0.5)
-        p = self.packet(CYAN)
-        self.send(p, web_pts + list(reversed(web_pts))[1:], CYAN, run_time=0.55)
+        p = packet(CYAN)
+        send(self, p, web_pts + list(reversed(web_pts))[1:], CYAN, run_time=0.55)
         self.remove(p)
         # the answer comes back into the chat
         a_box = RoundedRectangle(corner_radius=0.1, width=CHAT_W - 0.4, height=0.72).set_stroke(ORANGE, 1.4)
         a_box.set_fill(BODY, 1).move_to(win.get_corner(DL) + np.array([0.2, 0.2, 0]), aligned_edge=DL).set_z_index(4)
-        p = self.packet(ORANGE)
-        self.send(p, [chip.port(LEFT), [IN_X, OUT_Y, 0]], ORANGE, run_time=0.3)
+        p = packet(ORANGE)
+        send(self, p, [chip.port(LEFT), [IN_X, OUT_Y, 0]], ORANGE, run_time=0.3)
         self.play(FadeOut(p), run_time=0.2)
         widths = [2.5, 2.1, 1.5]
         lines = VGroup(*[Line(LEFT * w / 2, RIGHT * w / 2).set_stroke(ORANGE, 2.0, 0.85) for w in widths])
@@ -529,9 +409,8 @@ class Film(MovingCameraScene):
         self.play(FadeTransform(lines, cur), run_time=0.45)
         for v in (int(rng.integers(90, 400)), int(rng.integers(10, 60)), ):
             nxt = num(v)
-            self._raw = True
-            self.play(FadeTransform(cur, nxt), run_time=0.25)
-            self._raw = False
+            with self.exact():
+                self.play(FadeTransform(cur, nxt), run_time=0.25)
             cur = nxt
         final = VGroup(Text("?", font=LABEL, font_size=32, color=ORANGE),
                        L("SOURCE: WEB", 10, ORANGE, spacing=2)).arrange(RIGHT, buff=0.3).move_to(a_box).set_z_index(5)
@@ -676,7 +555,7 @@ class Film(MovingCameraScene):
         for k in range(n):
             src = sources[int(rng.integers(0, len(sources)))]
             r = racks[int(rng.integers(0, len(racks)))]
-            d = self.packet(CYAN).scale(0.55).move_to(src.get_center())
+            d = packet(CYAN).scale(0.55).move_to(src.get_center())
             pk.append((d, r[2][int(rng.integers(0, 6))].get_center()))
         self.add(*[d for d, _ in pk])
         return [LaggedStart(*[d.animate(rate_func=rate_functions.ease_in_out_sine).move_to(t).scale(0.4)
@@ -1046,8 +925,8 @@ class Film(MovingCameraScene):
         self.play(LaggedStart(*[TransformFromCopy(n, g) for n, g in zip(self.nodes, grid)], lag_ratio=0.1),
                   run_time=0.8)
         # ② the chip picks PARKING SESSIONS (in the panel and in the MCP at the same time)
-        self.play(grid[SEL][0].animate.set_stroke(WHITE, 2, 1), self.dim([g for k, g in enumerate(grid) if k != SEL], 0.3),
-                  occ[0].animate.set_stroke(color=WHITE), self.dim(others, 0.3), run_time=0.5)
+        self.play(grid[SEL][0].animate.set_stroke(WHITE, 2, 1), dim([g for k, g in enumerate(grid) if k != SEL], 0.3),
+                  occ[0].animate.set_stroke(color=WHITE), dim(others, 0.3), run_time=0.5)
         # ③ the call leaves with its parameters; the path is drawn down to the table
         call1 = steps[1][0]
         self.play(self.chip.pulse(CYAN), run_time=0.3)
@@ -1077,14 +956,13 @@ class Film(MovingCameraScene):
         win2 = neon(tall, ICE, 1.6, fill=BODY).set_z_index(3)
         # the window grows, the 1st exchange fades, the same question is typed again
         self.play(Transform(self.user[0], win2),
-                  self.dim([self.badge], 0),
+                  dim([self.badge], 0),
                   first.animate.set_opacity(0.45),
                   self.q_box.animate.set_opacity(0.45), self.question.animate.set_opacity(0.45), run_time=0.4)
         self.badge.next_to(win2, UP, 0.16).align_to(win2, LEFT).shift(RIGHT * 0.1)
-        self.play(FadeIn(q2[0], shift=LEFT * 0.1), self.dim([self.badge], 1), run_time=0.25)
-        self._raw = True
-        self.play(AddTextLetterByLetter(q2[1], time_per_char=0.02), run_time=0.5)
-        self._raw = False
+        self.play(FadeIn(q2[0], shift=LEFT * 0.1), dim([self.badge], 1), run_time=0.25)
+        with self.exact():
+            self.play(AddTextLetterByLetter(q2[1], time_per_char=0.02), run_time=0.5)
         self.ask(run_time=0.4)
         call = steps[1][0]
         call2 = VGroup(grid[alt].copy(), *[m.copy() for m in call[1:]]).arrange(RIGHT, buff=0.06).move_to(call)
@@ -1096,14 +974,14 @@ class Film(MovingCameraScene):
         lit2.set_z_index(5)
         alt_t = self.tables[CONCEPT_TABLES[alt][0]]
         # this time the chip takes ON-STREET SESSIONS: the 1st path stays visible (dimmed), the 2nd is drawn next to it
-        self.play(grid[SEL][0].animate.set_stroke(CYAN, 1.1, 0.5), self.dim([grid[alt]], 1.0),
+        self.play(grid[SEL][0].animate.set_stroke(CYAN, 1.1, 0.5), dim([grid[alt]], 1.0),
                   grid[alt][0].animate.set_stroke(ORANGE, 2, 1), FadeOut(call[0]), self.chip.pulse(ORANGE),
                   lit.animate.set_stroke(CYAN, opacity=0.4), run_time=0.5)
         self.llm_sends(call2[0], call2[0], ORANGE)
         self.remove(*call[1:])
         self.add(call2)
         self.play(Succession(Create(lit2[0]), Create(lit2[1]), Create(lit2[2]), lag_ratio=1),
-                  self.dim([self.nodes[alt], alt_t], 1.0), alt_t[0].animate.set_stroke(ORANGE, 2),
+                  dim([self.nodes[alt], alt_t], 1.0), alt_t[0].animate.set_stroke(ORANGE, 2),
                   self.nodes[alt][0].animate.set_stroke(color=ORANGE), run_time=0.8)
         self.play(FadeIn(wrong, shift=UP * 0.1), run_time=0.4)
         # same question, two answers: ≠
@@ -1143,7 +1021,7 @@ class Film(MovingCameraScene):
         fly = chip_m.copy().scale(0.85)
         x_in = ANS_IN[0] + 0.12
         route = [self.chip.port(RIGHT), [x_in, OUT_Y, 0], [x_in, target.get_y(), 0], target.get_left() + LEFT * 0.05]
-        self.send(fly, route, color, run_time=0.8)
+        send(self, fly, route, color, run_time=0.8)
         self.play(fly.animate.scale(1 / 0.85).move_to(target), run_time=0.25)
         self.remove(fly)
         self.add(target)
@@ -1250,7 +1128,7 @@ class Film(MovingCameraScene):
         self.background = [self.band, self.band_label, self.nodes, self.bus, self.trunk, self.lit, self.roots,
                            self.tables, self.vault, self.sens_lbl]
         # inside the harness the chip gets a little smaller: one step among others
-        self.play(self.dim(self.background, 0.3), FadeOut(self.lit[1]), FadeOut(self.chat_extra[2:]),
+        self.play(dim(self.background, 0.3), FadeOut(self.lit[1]), FadeOut(self.chat_extra[2:]),
                   self.chip.animate.scale(CHIP_IN_HARNESS), run_time=0.5)
 
         self.chip.size *= CHIP_IN_HARNESS   # the pins (port) follow the new size
@@ -1312,11 +1190,10 @@ class Film(MovingCameraScene):
         tests = VGroup(tl, count)
         # tests passed: the matrix resolves into function names
         targets = self.code_lines.copy().set_opacity(1)
-        self._raw = True   # quick pass: the matrix resolves while the counter settles
-        self.play(*[FadeTransform(m, c_) for m, c_ in zip(matrix, targets)],
-                  tests.animate.scale(0.5).move_to(fbox.get_corner(UR) + np.array([-0.16, -0.18, 0]), aligned_edge=UR),
-                  FadeOut(bg), run_time=0.45)
-        self._raw = False
+        with self.exact():  # quick pass: the matrix resolves while the counter settles
+            self.play(*[FadeTransform(m, c_) for m, c_ in zip(matrix, targets)],
+                      tests.animate.scale(0.5).move_to(fbox.get_corner(UR) + np.array([-0.16, -0.18, 0]), aligned_edge=UR),
+                      FadeOut(bg), run_time=0.45)
         self.remove(*targets)
         self.code_lines.set_opacity(1)
         bgs.set_fill(opacity=0.85)
@@ -1415,11 +1292,11 @@ class Film(MovingCameraScene):
 
     def ask_format(self):
         """The question enters the harness: FORMAT checks it before it reaches the chip."""
-        p = self.packet(ICE)
+        p = packet(ICE)
         g0 = self.gates[0][0].get_center()
-        self.send(p, [[IN_X, OUT_Y, 0], g0], ICE, run_time=0.35)
+        send(self, p, [[IN_X, OUT_Y, 0], g0], ICE, run_time=0.35)
         self.play(*self.check(0), run_time=0.35)
-        self.send(p, [g0, self.chip.port(LEFT)], GREEN, run_time=0.3)
+        send(self, p, [g0, self.chip.port(LEFT)], GREEN, run_time=0.3)
         self.play(self.chip.pulse(), FadeOut(p), run_time=0.4)
 
     def run(self, call_text, log, to_chat=False, ask=True, scope=None):
@@ -1427,35 +1304,35 @@ class Film(MovingCameraScene):
         if ask:
             self.ask_format()
             self.play(*self.code_step(1), Flash(self.strip[2][SEL], color=ORANGE, flash_radius=0.5), run_time=0.35)
-        p = self.packet(CYAN)
+        p = packet(CYAN)
         top = self.chip.port(DOWN)
         g1, g2 = self.gates[1][0].get_center(), self.gates[2][0].get_center()
-        self.send(p, [top, g1], CYAN, run_time=0.3)
+        send(self, p, [top, g1], CYAN, run_time=0.3)
         if scope is not None:  # SCOPE does not know the zone: it calls the user's rights
             self.scope_lookup(scope)
         self.play(*self.check(1), run_time=0.35)
-        self.send(p, [g1, g2], CYAN, run_time=0.3)
+        send(self, p, [g1, g2], CYAN, run_time=0.3)
         self.play(*self.check(2), run_time=0.3)
         node = self.nodes[SEL]
         path = [g2, [CHIP_POS[0], BUS_Y, 0]] + self.bus_pts[SEL][1:]
         # the call reaches the MCP: the semantic layer lights up (the rails stay subtle)
         paths = [self.bus, self.trunk, self.lit, self.roots]
         rest = [m for m in self.background if all(m is not p_ for p_ in paths)]
-        self.play(self.dim(rest, 1.0), self.dim(paths, 0.45), *self.code_step(4), run_time=0.35)
-        self.send(p, path, CYAN, run_time=0.6)
+        self.play(dim(rest, 1.0), dim(paths, 0.45), *self.code_step(4), run_time=0.35)
+        send(self, p, path, CYAN, run_time=0.6)
         self.play(Flash(node, color=CYAN, flash_radius=0.8), run_time=0.35)
         # the MCP fetches the data, then goes back up
         down = [node.get_bottom(), [node.get_x(), self.data_box.get_top()[1], 0]]
-        self.send(p, down, CYAN, run_time=0.35)
+        send(self, p, down, CYAN, run_time=0.35)
         self.play(Flash(p, color=CYAN, flash_radius=0.5, num_lines=8), run_time=0.3)
-        self.send(p, list(reversed(down)), CYAN, run_time=0.35)
-        self.send(p, list(reversed(path)) + [top], CYAN, run_time=0.7)
+        send(self, p, list(reversed(down)), CYAN, run_time=0.35)
+        send(self, p, list(reversed(path)) + [top], CYAN, run_time=0.7)
         self.play(self.chip.pulse(CYAN), run_time=0.35)
         g3 = self.gates[3][0].get_center()
-        self.send(p, [self.chip.port(RIGHT), g3], GREEN, run_time=0.4)
+        send(self, p, [self.chip.port(RIGHT), g3], GREEN, run_time=0.4)
         self.play(*self.check(3), self.add_log(*log), run_time=0.35)
         if not to_chat:
-            self.send(p, [g3, ANS_IN], GREEN, run_time=0.35)
+            send(self, p, [g3, ANS_IN], GREEN, run_time=0.35)
         self.play(FadeOut(p, scale=0.3), run_time=0.15)
 
     def a5_scoped_question(self):
@@ -1594,15 +1471,15 @@ class Film(MovingCameraScene):
         g = self.gates[1][0]
         x = (self.box_shape.get_left()[0] + self.chat_win.get_right()[0]) / 2
         route = [g.get_left(), [x, g.get_y(), 0], [x, badge.get_y(), 0], badge.get_right() + RIGHT * 0.08]
-        q = self.packet(ORANGE)
-        self.send(q, route, ORANGE, run_time=0.6)
+        q = packet(ORANGE)
+        send(self, q, route, ORANGE, run_time=0.6)
         self.play(FadeOut(q), Flash(badge[0], color=ORANGE, flash_radius=0.35, num_lines=8),
                   *self.badge_grow(2), run_time=0.5)
         txt = L("WEST ZONE", 8, ORANGE, spacing=2)
         box = RoundedRectangle(corner_radius=0.06, width=txt.width + 0.22, height=0.24)
         pill = VGroup(box.set_fill(BODY, 1).set_stroke(ORANGE, 1.2, 1), txt.move_to(box)).set_z_index(8)
         dest = g.get_right() + RIGHT * (0.2 + pill.width / 2)
-        self.send(pill, list(reversed(route)) + [dest], ORANGE, run_time=0.8)
+        send(self, pill, list(reversed(route)) + [dest], ORANGE, run_time=0.8)
         self.scope_pill = pill
 
     # --- 06 · Together -------------------------------------------------------------------------------------------
