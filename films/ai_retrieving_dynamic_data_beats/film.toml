@@ -1,7 +1,0 @@
-# Engine pilot: acts 01 and 06 of the legacy film re-expressed as Film/Act/Beat (compare with the legacy by eye).
-title = "AI - Retrieving dynamic data"
-kind = "engine"
-scene_file = "film.py"
-scene_class = "Film"
-acts = ["ai", "together"]
-langs = ["en", "fr"]

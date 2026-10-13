@@ -12,6 +12,10 @@ Default transition between two states, by id:
   new id   → fade in        missing id → fade out
   morph_from={"new_id": "old_id"} pairs pieces with different ids (e.g. a block becoming a word).
 A custom motion(scene, prev, cur) plays whatever it wants; afterwards the engine makes `cur` exactly what is on screen.
+
+Live beats (`Beat(name, play=fn)`, no state): `play(scene)` animates persistent actors kept on the film's Stage — the
+way a film made before the engine (or one with time-dependent pieces) is written. The screen is whatever the code
+leaves; stills fast-forward through the film and capture the frame at the end of each beat; animatic = full.
 """
 
 import json
@@ -34,12 +38,13 @@ MODES = ("still", "animatic", "full")
 @dataclass
 class Beat:
     name: str
-    state: Callable                         # state(stage) -> {id: mobject}
+    state: Callable | None = None           # state(stage) -> {id: mobject}; None for a live beat
     motion: Callable | None = None          # motion(scene, prev, cur), full mode only
     hold: float = 1.2                       # seconds on screen after the transition
     morph_from: dict = field(default_factory=dict)   # {new_id: old_id}
     note: str = ""                          # shown on the stills page
     run_time: float = 0.8                   # default transition duration
+    play: Callable | None = None            # live beat: play(scene) on the persistent Stage
 
 
 @dataclass
@@ -48,6 +53,7 @@ class Act:
     title: str                              # chapter label, e.g. "01 · THE AI"
     toc: str                                # chapter name in the player
     beats: list
+    auto_chapter: bool = True               # False: the act's beats call scene.chapter(...) themselves
 
 
 def _signature(m):
@@ -116,8 +122,13 @@ class FilmScene(StudioScene):
     # --- Animated modes -----------------------------------------------------------------------------
     def play_act(self, act):
         for i, beat in enumerate(act.beats):
+            if beat.play is not None:  # live beat
+                beat.play(self)
+                if beat.hold > 0:
+                    self.hold(beat.hold)
+                continue
             cur = beat.state(self.stage)
-            extra = self.chapter_anims(act) if i == 0 else []
+            extra = self.chapter_anims(act) if i == 0 and act.auto_chapter else []
             if self.mode == "full" and beat.motion is not None:
                 if extra:
                     self.play(*extra, run_time=0.7)
@@ -165,6 +176,10 @@ class FilmScene(StudioScene):
 
     # --- Still mode ---------------------------------------------------------------------------------
     def stills(self):
+        live = any(b.play is not None for a in self.acts for b in a.beats)
+        if live:  # fast-forward: every beat runs (skipped), the frame is captured at each beat's end
+            self.chapters, self.chapter_lbl, self.shown = [], None, {}
+            self.next_section("stills", skip_animations=True)
         out = Path(os.environ.get("FILM_OUT", "."))
         out.mkdir(parents=True, exist_ok=True)
         names = [a.name for a in self.acts]
@@ -175,16 +190,28 @@ class FilmScene(StudioScene):
         for ai, act in enumerate(self.acts):
             for bi, beat in enumerate(act.beats):
                 n += 1
-                if not lo <= ai <= hi:
+                if live:
+                    if beat.play is not None:
+                        beat.play(self)
+                    if not lo <= ai <= hi:
+                        if beat.hold > 0:
+                            self.hold(beat.hold)
+                        continue
+                    self.renderer.update_frame(self, ignore_skipping=True)
+                elif not lo <= ai <= hi:
                     continue
-                self.clear()
-                lbl = self.chapter_label(act.title)
-                lbl.clear_updaters()
-                self.add(*beat.state(self.stage).values(), lbl)
-                self.renderer.update_frame(self, ignore_skipping=True)
+                else:
+                    self.clear()
+                    lbl = self.chapter_label(act.title)
+                    lbl.clear_updaters()
+                    self.add(*beat.state(self.stage).values(), lbl)
+                    self.renderer.update_frame(self, ignore_skipping=True)
                 fname = f"{n:02d}_{act.name}_{beat.name}.png"
                 Image.fromarray(self.renderer.get_frame()).convert("RGB").save(out / fname)
                 index.append({"n": n, "act": act.name, "act_title": self.tr(act.title), "beat": beat.name,
-                              "note": beat.note, "motion": beat.motion is not None, "hold": beat.hold, "file": fname})
+                              "note": beat.note, "motion": beat.motion is not None or beat.play is not None,
+                              "hold": beat.hold, "file": fname})
+                if live and beat.hold > 0:
+                    self.hold(beat.hold)
         (out / "stills.json").write_text(json.dumps({"title": self.tr(self.title), "lang": current_lang(),
                                                      "beats": index}, ensure_ascii=False, indent=1))

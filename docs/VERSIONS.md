@@ -94,3 +94,4 @@ EN + FR, 1,899/1,899 frames, ≈ 90 s). Frames: `frames/50–55`.
 | `2f7bdab` | 5 Skill | Gates G1–G4 (one file each), `STATUS.md` per film, `studio extract` (pptx / pdf / md) |
 | `3b5e5d3` | 6 Docs | These docs copied in; Generation 5 recorded |
 | `7f889f1` … (this) | 7 Pilot | First film made only through the gates: `films/ai_strategy_comex` (COMEX opener, assist ≠ automate, from `Strategie_IA_COMEX_Indigo.pptx`): G1 brief → G2 9 stills (FR + EN) → G3 animatic 29.8 s → G4 3 motions → final FR 1080p60, 32.2 s. One validation per gate; no re-done gate |
+| (this) | Port | The first film ported to Film/Act/Beat: `legacy_scene.py` (1,461 lines, 1 class) → `film.py` storyboard + 35 beats, `film_data`, `film_stage`, `film_pieces`; regress IDENTICAL EN + FR; acts-01+06 pilot removed |

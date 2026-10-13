@@ -1,298 +1,123 @@
-""""AI - Retrieving dynamic data" — standalone film, TRON style, no speaker (legacy scene).
+""""AI - Retrieving dynamic data" — standalone film, TRON style, no speaker.
 
-A video that explains itself: keywords only, continuous pace.
-Business example: parking (car park occupancy, sensors, subscriptions).
+The general AI does not know our data; the MCP brings meaning (a semantic layer between the AI and the data) and the
+Harness — code, versioned and tested, that frames the chip — brings trust. Business example: parking.
 
-Architecture shown:
-  - the problem: the AI chip wired straight onto the raw data;
-  - the MCP: a semantic layer between the AI and the data;
-  - the Harness: code (versioned, tested) that compiles into a frame AROUND the
-    chip. It receives the question, lets the chip produce a tool call, checks that
-    tool call (scope, rights) before running it through the MCP, then checks the
-    answer (format) and traces everything (audit log).
+How to read this file
+- `acts` (just below) is the storyboard: 6 acts, 35 beats, each with a one-line note. Start there.
+- Each beat is a method `b_<name>` further down, in story order: the animation of that moment, played on the shared
+  Stage `self.st` (film_stage.py). A beat ends where the viewer gets time to read (`hold`, in seconds).
+- Text, business data and positions: film_data.py. Film-specific building blocks (map, wiring, panels, the harness
+  run): film_pieces.py. Generic pieces come from the kit (studio/kit, see gallery/README.md).
 
-On-screen text is written in English; `FR` holds the French version (FILM_LANG=fr).
-
-    studio act ai_retrieving_dynamic_data harness   # one act, 480p draft + loop page
-    studio dev ai_retrieving_dynamic_data           # whole film, 480p draft
-    studio final ai_retrieving_dynamic_data --validated
+    studio still ai_retrieving_dynamic_data           # one frame per beat (fast-forward)
+    studio act ai_retrieving_dynamic_data harness     # one act, 480p loop page
+    studio regress ai_retrieving_dynamic_data         # pixel-identical to the baseline (EN + FR)
 """
-
-
-from dataclasses import dataclass
 
 import numpy as np
 from manim import *
 
-from studio.kit import primitives as kit
-from studio.kit.actors import (Badge, Band, Chat, Chip, CodeFile, Module, data_block, harness_clamps, harness_frame,
-                               packet, panel_frame)
-from studio.kit.i18n import Translator, current_lang
-from studio.kit.layout import (ANS_IN, BAND_Y, BUS_Y, CHAT_C, CHAT_H, CHAT_W, CHIP_POS, DATA_Y, IN_X,
-                               OUT_Y, USER_POS)
+from studio.engine import Act, Beat, FilmScene
+from studio.kit.actors import Badge, Chat, Chip, CodeFile, Module, data_block, harness_clamps, harness_frame, packet
+from studio.kit.layout import ANS_IN, BAND_Y, CHAT_C, CHAT_H, CHAT_W, CHIP_POS, DATA_Y, IN_X, OUT_Y, USER_POS
 from studio.kit.motions import dim, morph, send, words_from_blocks
-from studio.kit.scene import StudioScene
-from studio.kit.primitives import (BODY, CYAN, DIMC, GREEN, ICE, LABEL, MONO, NEON_OPS, ORANGE, RED, TITLE, flash_along, globe,
-                                   icon_check, icon_doc, icon_format, icon_list, icon_lock, icon_log, icon_mail,
-                                   icon_scope, icon_sheet, icon_tool_card, icon_user, neon, rack, rail, square_dot)
+from studio.kit.primitives import (BODY, CYAN, DIMC, GREEN, ICE, LABEL, MONO, ORANGE, RED, TITLE, flash_along, globe,
+                                   icon_check, icon_doc, icon_log, icon_sheet, icon_user, neon, rail, square_dot)
 
-FW = config.frame_width
-
-# --- Language: FILM_LANG=en (default) or fr. On-screen text is written in English; FR holds the French. --
-LANG = current_lang()
-FR = {  # English source text → French
-    "CHAT · AI": "CHAT · IA",
-    "AI - Retrieving dynamic data": "IA - Récupérer des données dynamiques", "01 · THE AI": "01 · L'IA",
-    "02 · OUR REALITY": "02 · NOTRE RÉALITÉ", "03 · THE PROBLEM": "03 · LE PROBLÈME",
-    "04 · WHAT DOES OUR DATA MEAN?": "04 · QUE VEULENT DIRE NOS DONNÉES ?",
-    "What does our data mean?": "Que veulent dire nos données ?",
-    "05 · HARNESS → TRUST": "05 · HARNESS → LA CONFIANCE", "06 · TOGETHER": "06 · ENSEMBLE",
-    "General AI": "L'IA générale", "Our reality": "Notre réalité", "The problem": "Le problème",
-    "Harness: trust": "Harness : la confiance", "Together": "Ensemble", "AI": "IA", "BOOKS": "LIVRES",
-    "PUBLIC DATA": "DONNÉES PUBLIQUES", "WRITE A CLIENT EMAIL": "RÉDIGE UN MAIL CLIENT", "EMAIL READY": "E-MAIL PRÊT",
-    "SUMMARISE A CONTRACT": "RÉSUME UN CONTRAT", "5 KEY POINTS": "5 POINTS CLÉS",
-    "WRITE AN EXCEL FORMULA": "ÉCRIS UNE FORMULE EXCEL", "FORMULA": "FORMULE", "GENERAL AI": "IA GÉNÉRALE",
-    "FAST · VERSATILE": "RAPIDE · POLYVALENTE", "OUR CAR PARKS · PARIS?": "NOS PARKINGS · PARIS ?",
-    "MEMORY": "MÉMOIRE", "SOURCE: WEB": "SOURCE : WEB", "WORLD": "MONDE", "TENS": "DES DIZAINES",
-    "HUNDREDS": "DES CENTAINES", "THOUSANDS": "DES MILLIERS", "OF CAR PARKS": "DE PARKINGS",
-    "MILLIONS": "DES MILLIONS", "TENS OF MILLIONS": "DES DIZAINES DE MILLIONS",
-    "OF EVENTS / DAY": "D'ÉVÉNEMENTS / JOUR", "TERABYTES": "DES To", "HUNDREDS OF TB": "DES CENTAINES DE To",
-    "PETABYTES": "DES Po", "STORED": "STOCKÉS", "DATABASES": "BASES DE DONNÉES", "SENSORS": "CAPTEURS",
-    "TICKETING": "BILLETTERIE", "SUBSCRIPTIONS": "ABONNEMENTS", "MASTER DATA": "RÉFÉRENTIEL",
-    "DOZENS OF SYSTEMS · HUNDREDS OF TABLES": "DES DIZAINES DE SYSTÈMES · DES CENTAINES DE TABLES",
-    "PRIVATE": "PRIVÉ", "PARKING SESSIONS · PARIS · SEPT.?": "STATIONNEMENTS · PARIS · SEPT. ?",
-    "DIRECT ACCESS TO TABLES": "ACCÈS DIRECT AUX TABLES", "AMBIGUOUS": "AMBIGUË",
-    "4 DEFINITIONS → 4 ANSWERS": "4 DÉFINITIONS → 4 RÉPONSES", "CAR PARKS": "PARKINGS", "+ STREET": "+ VOIRIE",
-    "NO DUPLICATES": "SANS DOUBLONS", "WITH DUPLICATES": "AVEC DOUBLONS", "1.12 M": "1,12 M", "1.48 M": "1,48 M",
-    "1.86 M": "1,86 M", "2.41 M": "2,41 M", "SEMANTIC LAYER": "COUCHE SÉMANTIQUE", "TOOL CALL": "APPEL D'OUTIL",
-    "TABLES": "TABLEAUX", "CHARTS": "GRAPHIQUES", "REPORTS": "RAPPORTS",
-    "RETRIEVING DYNAMIC DATA": "RÉCUPÉRER DES DONNÉES DYNAMIQUES", "UNDERSTANDING": "COMPRÉHENSION",
-    "DATA": "DONNÉES", "DIRECTOR": "DIRECTEUR", "USER": "UTILISATEUR",
-    "PARKING SESSIONS · SEPT.?": "STATIONNEMENTS · SEPT. ?", "WEST ZONE": "ZONE OUEST", "0.31 M": "0,31 M",
-    "OFF-STREET · WEST ZONE · 09/26": "HORS VOIRIE · ZONE OUEST · 09/26",
-    "09:14 sessions · west OK": "09:14 sessions · ouest OK", "TOOLS": "OUTILS", "0.74 M": "0,74 M",
-    "DEFAULT · CAR PARKS": "PAR DÉFAUT · PARKINGS", "NO MAP": "SANS CARTE", "DIRECT QUERY": "REQUÊTE DIRECTE",
-    "SENT TO MCP": "ENVOYÉ AU MCP", "TRUST": "CONFIANCE",
-    "WHAT DOES OUR DATA MEAN?": "QUE VEULENT DIRE NOS DONNÉES ?", "ON-STREET SESSIONS": "SESSIONS VOIRIE",
-    "OFF-STREET SESSIONS": "SESSIONS HORS VOIRIE",
-    "CAR PARKS · NO DUPLICATES · 09/26": "PARKINGS · SANS DOUBLONS · 09/26", "occupancy()": "occupation()",
-    "capacity()": "capacite()", "contracts()": "contrats()", "customers()": "clients()", "scope()": "perimetre()",
-    "pricing()": "tarifs()", "SCOPE": "PÉRIMÈTRE", "RIGHTS": "DROITS", "audit.log": "journal.log",
-}
+from film_data import *  # noqa: F401,F403  (FR, tr, L, T_, business data, layout, map)
+from film_pieces import Pieces
+from film_stage import Stage
 
 
-tr = Translator(FR, LANG)
+class Film(FilmScene, Pieces):
+    title = "AI - Retrieving dynamic data"
+    FR = FR
 
+    @property
+    def acts(self):
+        return [
+            Act("ai", "01 · THE AI", "General AI", auto_chapter=False, beats=[
+                Beat("sources", play=Film.b_sources, hold=0, note="Six public sources; PUBLIC DATA dimmed until relevant."),
+                Beat("chip_born", play=Film.b_chip_born, hold=0.3,
+                     note="Circuit weaving: rails from the sources draw the chip; the words melt into it."),
+                Beat("use_cases", play=Film.b_use_cases, hold=0.9,
+                     note="Sources → tasks and results; each example runs through, results turn green. GENERAL AI."),
+                Beat("question", play=Film.b_question, hold=0,
+                     note="The user becomes a chat window and asks about OUR car parks."),
+                Beat("web_guess", play=Film.b_web_guess, hold=0.5,
+                     note="The AI looks on the web, numbers flicker: ? · SOURCE: WEB."),
+            ]),
+            Act("reality", "02 · OUR REALITY", "Our reality", auto_chapter=False, beats=[
+                Beat("boundary", play=Film.b_boundary, hold=0, note="A dashed boundary: PUBLIC above, PRIVATE below."),
+                Beat("unfold", play=Film.b_unfold, hold=0,
+                     note="Our world unfolds and pushes the chip up; the user gets a badge (INDIGO · USER)."),
+                Beat("paris", play=Film.b_paris, hold=0, note="Paris: tens of car parks, events, storage, databases."),
+                Beat("france_world", play=Film.b_france_world, hold=0.3,
+                     note="Paris folds into France, France onto the globe; data rushes to the servers."),
+                Beat("tables", play=Film.b_tables, hold=0.8,
+                     note="Servers → systems → raw tables; the map folds away, the chip comes back."),
+                Beat("vault", play=Film.b_vault, hold=0, note="The boundary dims: the tables are our private data."),
+            ]),
+            Act("problem", "03 · THE PROBLEM", "The problem", auto_chapter=False, beats=[
+                Beat("direct_access", play=Film.b_direct_access, hold=0,
+                     note="The question goes straight to the tables: red wiring, DIRECT ACCESS TO TABLES."),
+                Beat("no_map", play=Film.b_no_map, hold=0, note="Right panel NO MAP: the 10 raw tables."),
+                Beat("first_guess", play=Film.b_first_guess, hold=0.15,
+                     note="Random pick; the wiring becomes the tree of definitions; a first answer in the chat."),
+                Beat("second_guess", play=Film.b_second_guess, hold=0.15, note="Asked again: another definition, "
+                                                                                 "another answer."),
+                Beat("ambiguous", play=Film.b_ambiguous, hold=0.6, note="Everything turns red: AMBIGUOUS."),
+                Beat("semantic_layer", play=Film.b_semantic_layer, hold=0.4,
+                     note="The tree nodes become ?, climb into the band and merge into SEMANTIC LAYER."),
+                Beat("our_question", play=Film.b_our_question, hold=0.9,
+                     note="…which rises to the band title: WHAT DOES OUR DATA MEAN?"),
+            ]),
+            Act("mcp", "04 · WHAT DOES OUR DATA MEAN?", "What does our data mean?", auto_chapter=False, beats=[
+                Beat("meaning", play=Film.b_meaning, hold=0,
+                     note="The band turns green and becomes the MCP; the question becomes the chapter title."),
+                Beat("domains", play=Film.b_domains, hold=0,
+                     note="5 domains wired at right angles to their tables; rails dimmed once drawn."),
+                Beat("tool_call", play=Film.b_tool_call, hold=0.9,
+                     note="TOOL CALL panel: domains → choice → call; one path lit; the right answer in the chat."),
+                Beat("second_ask", play=Film.b_second_ask, hold=0.6,
+                     note="Same question again: ON-STREET this time — two answers, ≠."),
+                Beat("data", play=Film.b_data, hold=0, note="Explained: the tables condense into one DATA block."),
+            ]),
+            Act("harness", "05 · HARNESS → TRUST", "Harness: trust", auto_chapter=False, beats=[
+                Beat("harness_frame", play=Film.b_harness_frame, hold=0,
+                     note="The chip shrinks; the harness frame is drawn; the tool panel becomes its TOOLS step."),
+                Beat("tested", play=Film.b_tested, hold=0,
+                     note="harness.py: tests run as a matrix (48/48), then resolve into function names."),
+                Beat("locked", play=Film.b_locked, hold=0.5, note="The harness locks: input, output, data access."),
+                Beat("director_asks", play=Film.b_director_asks, hold=0.6,
+                     note="A director asks without a zone; the harness reads the tool descriptions, picks off-street."),
+                Beat("scoped_call", play=Film.b_scoped_call, hold=1.0,
+                     note="SCOPE fetches the user's zone (WEST); checked call → MCP → data → checked answer: 0.31 M ✓."),
+                Beat("condense", play=Film.b_condense, hold=1.0,
+                     note="Explained: the detail condenses into icons (harness · MCP · DATA)."),
+            ]),
+            Act("together", "06 · TOGETHER", "Together", auto_chapter=False, beats=[
+                Beat("big_picture", play=Film.b_big_picture, hold=0,
+                     note="Only the frame remains; the whole circuit lights up once."),
+                Beat("deliverables", play=Film.b_deliverables, hold=0,
+                     note="The answer becomes tables, charts, reports."),
+                Beat("back_to_user", play=Film.b_back_to_user, hold=1.0, note="…sent back to the user, in the chat."),
+                Beat("trust_meaning", play=Film.b_trust_meaning, hold=1.0,
+                     note="Only the blocks remain; harness → TRUST, MCP → SEMANTIC LAYER."),
+                Beat("understanding", play=Film.b_understanding, hold=0.6, note="SEMANTIC LAYER → UNDERSTANDING."),
+                Beat("retrieving", play=Film.b_retrieving, hold=3.0, note="End on words: RETRIEVING DYNAMIC DATA."),
+            ]),
+        ]
 
-def L(text, *a, **k):
-    return kit.label(tr(text), *a, **k)
-
-
-def T_(text, **k):
-    """Translated Text()."""
-    return Text(tr(text), **k)
-
-
-# --- Business example (illustrative figures, to be replaced by real ones) -----------------------------
-QUESTION = tr("PARKING SESSIONS · PARIS · SEPT.?")
-CALL_OK = tr('stationnements("PARIS", "09/26")')
-# tree of possibilities: 2 definitions × 2 ways of counting = 4 answers
-TREE_L1 = [tr(x) for x in ["CAR PARKS", "+ STREET"]]
-TREE_L2 = [tr(x) for x in ["NO DUPLICATES", "WITH DUPLICATES"]]
-TREE_LEAVES = [tr(x) for x in ["1.12 M", "1.48 M", "1.86 M", "2.41 M"]]   # (P,no dup) (P,dup) (P+S,no dup) (P+S,dup)
-TRIES = [1, 3]                                         # leaf picked at each attempt (never the right one)
-GUESSES = [TREE_LEAVES[i] for i in TRIES]
-GOOD = (tr("1.12 M"), tr("CAR PARKS · NO DUPLICATES · 09/26"))
-QUESTION_ME = tr("PARKING SESSIONS · SEPT.?")            # no zone: the harness derives it from the user's rights
-# the user's context grows act by act: 02 · 04 (with the MCP) · 05 (when SCOPE asks for it)
-USER_CTX = [["INDIGO", "USER"], ["INDIGO", "DIRECTOR"], ["INDIGO", "DIRECTOR", "WEST ZONE"]]  # [1] unused
-# Deliberately vague orders of magnitude (no precise figures until validated)
-LEVELS = ["PARIS", "FRANCE", "WORLD"]
-PARKS_MAG = ["TENS", "HUNDREDS", "THOUSANDS"]
-EVENTS_MAG = ["THOUSANDS", "MILLIONS", "TENS OF MILLIONS"]
-STORAGE_MAG = ["TERABYTES", "HUNDREDS OF TB", "PETABYTES"]
-RACKS = [1, 5, 12]                         # databases lit per level
-SYSTEMS = ["SENSORS", "TICKETING", "SUBSCRIPTIONS", "CRM", "FINANCE", "MASTER DATA"]
-# deliberately confusing tables: duplicates, versions, temp tables, overlapping notions
-TABLES = ["stn_evt_raw", "stn_evt_v2", "stn_v2_bkp", "stat_park_tmp", "pk_site_ref", "tkt_pass_24",
-          "voirie_horod", "abo_ctr_24", "zone_idf_map", "cpt_old_2019"]
-CONCEPTS = [("ON-STREET SESSIONS", 6), ("OFF-STREET SESSIONS", 0), ("CAR PARKS", 4), ("SUBSCRIPTIONS", 7), ("ZONES", 8)]
-CONCEPT_TABLES = [[6], [0, 5], [4], [7], [8]]   # tables read by each MCP domain
-TEXT_DIM = 0.6                                  # act 03: tree labels stay readable when dimmed
-BOTTOM_DIM = 0.25                               # act 03: wiring and tree dimmed while the panel is shown
-CHIP_IN_HARNESS = 0.8                           # chip scale once inside the harness
-RUN_LINES = ["check_format(question)", "tools = mcp.list_tools()", "scope = user.zone()",
-             "assert user.can_read(tool)", "data = mcp.call(tool, scope)", "log.trace(request)"]
-GATE_LINE = {0: 0, 1: 2, 2: 3, 3: 5}               # harness module → line of harness.py that runs
-TOOLS_H = 1.2                                  # height of the TOOLS step, above the chip
-SEL = 1                                         # domain picked for the question (off-street = car parks)
-# each domain exposes 2 tools, each tool reads one table (almost every valid table is wired)
-TOOLS = [[("sessions()", 0), ("occupancy()", 5)], [("sites()", 4), ("capacity()", 6)],
-         [("contracts()", 7), ("customers()", 7)], [("scope()", 8), ("pricing()", 6)]]
-LEAF_TABLES = [[0], [0, 2], [1, 6], [3, 6, 9]]   # tables read by each definition (tree leaf)
-
-# --- Diagram layout (standard anchors in studio.kit.layout; film-specific positions here) ----------------
-FRAME = (np.array([0.225, 0.575, 0]), 5.55, 3.65)          # the Harness surrounds the chip
-GATES = [  # (name, icon, position, label side)  — in the order of the lines of harness.py
-    ("FORMAT", icon_format, np.array([-2.55, OUT_Y, 0]), DOWN),   # on the way in, before the chip
-    ("SCOPE", icon_scope, np.array([-1.2, -0.25, 0]), LEFT),
-    ("RIGHTS", icon_lock, np.array([-1.2, -0.9, 0]), LEFT),
-    ("TRACE", icon_log, np.array([1.6, OUT_Y, 0]), DOWN),
-]
-JOURNAL_C = np.array([1.85, OUT_Y, 0])   # the audit log lives in the harness, instead of the TRACE icon
-TABLE_XS = list(np.linspace(-6.1, 6.1, 10))
-J1_POS = [np.array([-3.6, -0.95, 0]), np.array([3.0, -0.95, 0])]   # branch CAR PARKS / + STREET
-J2_DX, J2_Y = 1.3, -1.85                                            # branch NO / WITH DUPLICATES
-
-# --- Map ------------------------------------------------------------------------------------------------
-MAP_C = np.array([-18.0, 0.0, 0])
-# Act 02 split screen: the map (built around MAP_C) is scaled down and placed below the boundary
-SPLIT_Y = -0.02                                   # PUBLIC (top) / PRIVATE (bottom) boundary
-TOP_Y = 2.45                                    # the boundary rises to here when our world unfolds
-PV_K = 0.9                                      # scale of the private area
-PV_REF = MAP_C + np.array([1.05, -0.075, 0])    # centre of the map content
-PV_DEST = np.array([0.1, -0.85, 0])             # where that centre appears on screen
-PUSH = dict(scale=0.45, to=np.array([-1.4, 3.25, 0]))  # the chip (and the user) pushed to the top
-MC = MAP_C + UP * 0.3
-COS = np.cos(np.radians(48))
-FR_C, FR_K = (2.5, 46.6), 0.56
-EU_C, EU_K = (10.0, 52.0), 0.19
-FRANCE = [(2.5, 51.1), (4.2, 50.0), (8.2, 49.0), (7.5, 47.5), (6.8, 46.4), (7.6, 45.2), (7.0, 44.0), (7.5, 43.7),
-          (4.8, 43.3), (3.1, 43.2), (3.2, 42.4), (1.5, 42.5), (-1.8, 43.4), (-1.2, 46.0), (-2.2, 47.2), (-4.7, 48.5),
-          (-1.6, 48.7), (-1.5, 49.7), (0.2, 49.5), (1.6, 50.9), (2.5, 51.1)]
-FR_CITIES = [(2.35, 48.85, 9), (4.85, 45.76, 4), (5.37, 43.3, 3), (3.06, 50.63, 3), (-0.58, 44.84, 3), (1.44, 43.6, 3),
-             (-1.55, 47.2, 3), (7.75, 48.58, 2), (7.26, 43.7, 2), (-1.68, 48.11, 2), (3.88, 43.61, 2), (5.72, 45.19, 2)]
-WORLD_DOTS = [(0.22, 0.55), (0.27, 0.5), (0.3, 0.58), (0.2, 0.47), (0.33, 0.52), (0.25, 0.6), (-0.55, 0.45),
-              (-0.48, 0.38), (-0.62, 0.52), (-0.42, 0.5), (-0.3, -0.25), (-0.25, -0.38), (-0.33, -0.12), (0.62, 0.38),
-              (0.7, 0.3)]
-
-
-def ll(lon, lat, k, c, center=MC):
-    return center + np.array([(lon - c[0]) * COS * k, (lat - c[1]) * k, 0])
-
-
-TASK_ICONS = [icon_mail, icon_doc, icon_sheet]
-
-
-@dataclass(slots=True)
-class Stage:
-    """Everything acts hand to each other, in one place. Created once in construct(); slots=True makes a typo
-    or an attribute invented inside an act fail immediately. Grouped by the act that first sets it."""
-    # a1_general_ai
-    chip: object = None
-    in_rail: object = None
-    intro_bits: object = None
-    out_rail: object = None
-    public: object = None
-    sources: object = None
-    traces: object = None
-    user: object = None
-    # a2_our_data
-    badge: object = None
-    count: object = None
-    count_lbl: object = None
-    ev_count: object = None
-    ev_lbl: object = None
-    frontier: object = None
-    level_lbl: object = None
-    paris: object = None
-    parks: object = None
-    pushed: object = None
-    rack_lbl: object = None
-    racks: object = None
-    racks_on: object = 0
-    st_count: object = None
-    st_lbl: object = None
-    unfold: object = None
-    # a2_zoom_out
-    tables: object = None
-    vault: object = None
-    # a3_direct_access
-    p3: object = None
-    p3_call: object = None
-    p3_grid: object = None
-    p3_rail: object = None
-    question: object = None
-    reply: object = None
-    # build_wiring
-    chaos: object = None
-    cut_pts: object = None
-    j1_pos: object = None
-    j2_pos: object = None
-    joints: object = None
-    seg1: object = None
-    seg2: object = None
-    seg3: object = None
-    # table_panel
-    p3_box: object = None
-    # a3_random_guesses
-    amb_sub: object = None
-    doubts: object = None
-    tree: object = None
-    # a3_ambiguity
-    band_ph: object = None
-    band_shape: object = None
-    box_shape: object = None
-    mcp: object = None
-    sens_lbl: object = None
-    sens_sub: object = None
-    # a4_semantic_layer
-    band: object = None
-    band_label: object = None
-    bus: object = None
-    bus_pts: object = None
-    chat_extra: object = None
-    data_box: object = None
-    lit: object = None
-    lit_ok: object = None
-    mini: object = None
-    nodes: object = None
-    p4_alt: object = None
-    roots: object = None
-    trunk: object = None
-    trunk_pts: object = None
-    # a5_build_harness
-    background: object = None
-    clamps: object = None
-    code: object = None
-    frame: object = None
-    frame_label: object = None
-    gates: object = None
-    log_top: object = None
-    logs: object = None
-    strip: object = None
-    tag: object = None
-    tests: object = None
-    # a5_scoped_question
-    ok: object = None
-    # scope_lookup
-    scope_pill: object = None
-    # condense
-    condensed: object = False
-    tools_icon: object = None
-
-
-class Film(StudioScene):
-    translate = staticmethod(tr)
-
-    def construct(self):
+    def build_stage(self):
         self.st = Stage()
-        self.run_acts([
-            ("ai", [self.a1_general_ai]),
-            ("reality", [self.a2_our_data, self.a2_zoom_out]),
-            ("problem", [self.a3_direct_access, self.a3_random_guesses, self.a3_ambiguity]),
-            ("mcp", [self.a4_semantic_layer]),
-            ("harness", [self.a5_build_harness, self.a5_scoped_question, self.a5_condense]),
-            ("together", [self.a6_together]),
-        ], "AI - Retrieving dynamic data")
+        return self.st
 
-    def ask(self, color=ICE, run_time=0.6):
-        p = packet(color)
-        send(self, p, [[IN_X, OUT_Y, 0], self.st.chip.port(LEFT)], color, run_time=run_time)
-        self.play(self.st.chip.pulse(), FadeOut(p), run_time=0.45)
-
-    # --- 01 · The AI: trained on the world, then general-purpose… but not on our data ---------------------------
-    def a1_general_ai(self):
+    # =============================================================================================================
+    # 01 · The AI: trained on the world, then general-purpose… but not on our data
+    # =============================================================================================================
+    def b_sources(self):
         self.chapter("01 · THE AI", "General AI")
         c = CHIP_POS
         sources = VGroup()
@@ -306,18 +131,15 @@ class Film(StudioScene):
         self.play(LaggedStart(*[FadeIn(s, scale=0.85) for s in sources], lag_ratio=0.15), FadeIn(public),
                   run_time=1.0)
         self.play(public.animate.set_opacity(0.3), run_time=0.3)  # dimmed until relevant
+        self.st.sources, self.st.public = sources, public
 
-        # the streams converge… and the chip is born from this data
-        rng = np.random.default_rng(1)
-
-
-        # dissolve: each dot flies to a point of the chip outline, which appears where they land
-        self.st.chip = Chip(label_text=tr("AI")).move_to(c)
+    def b_chip_born(self):
+        sources, public = self.st.sources, self.st.public
         # circuit weaving: each source sends right-angle rails towards the chip;
         # on arrival the rails draw the outline, then the core, then the pins; the words slide
         # along their rail and melt into the chip
-        chip = self.st.chip
-        self.st.chip.hide_pins()
+        self.st.chip = chip = Chip(label_text=tr("AI")).move_to(CHIP_POS)
+        chip.hide_pins()
         traces, words = VGroup(), []
         for k, src in enumerate(sources):
             col, row = divmod(k, 3)
@@ -335,7 +157,7 @@ class Film(StudioScene):
         # 2 · energy flows and draws the chip: outline → core → pins
         self.play(*[flash_along(t, WHITE, 4, run_time=1.0) for t in traces],
                   Create(chip.body), Create(chip.wires), public.animate.set_opacity(1), run_time=0.8)
-        self.play(Create(chip.die), Create(chip.pins, lag_ratio=0.05), *self.st.chip.show_pins(*pins_used), run_time=0.6)
+        self.play(Create(chip.die), Create(chip.pins, lag_ratio=0.05), *chip.show_pins(*pins_used), run_time=0.6)
         # 3 · the words slide along their rail and melt into the chip
         word_moves, ghosts = [], []
         for w in words:
@@ -348,17 +170,15 @@ class Film(StudioScene):
         self.remove(*ghosts)
         self.remove(*chip.submobjects)
         self.add(chip)
-        self.st.sources, self.st.traces = sources, traces
-        self.hold(0.3)
+        self.st.traces = traces
 
-
+    def b_use_cases(self):
         # a general intelligence: tasks and their results grow out of the chip, along rails
+        c, chip, public = CHIP_POS, self.st.chip, self.st.public
         tasks = [("WRITE A CLIENT EMAIL", "EMAIL READY"), ("SUMMARISE A CONTRACT", "5 KEY POINTS"),
                  ("WRITE AN EXCEL FORMULA", "FORMULA")]
-        chip = self.st.chip
         ins, outs, branches = VGroup(), VGroup(), VGroup()
-        self.play(public.animate.set_opacity(0.3), run_time=0.3)
-        self.st.public = public  # "PUBLIC DATA" stays until act 2
+        self.play(public.animate.set_opacity(0.3), run_time=0.3)  # "PUBLIC DATA" stays until act 2
         lefts, rights = VGroup(), VGroup()
         for k, (task, result) in enumerate(tasks):
             y = c[1] + 0.8 - 0.8 * k
@@ -388,22 +208,28 @@ class Film(StudioScene):
         tag = VGroup(L("GENERAL AI", 18, ICE, spacing=8), L("FAST · VERSATILE", 11, GREY_B, spacing=4))
         tag.arrange(DOWN, buff=0.1).next_to(chip, UP, 0.35)
         self.play(FadeIn(tag, shift=UP * 0.1), run_time=0.35)
-        self.hold(0.9)  # reading time for the use cases
-        done = ins
+        self.st.use_cases = VGroup(ins, outs, tag, branches)
+
+    def b_question(self):
         # … then a question about OUR business: the user becomes a chat window
+        chip = self.st.chip
+        done, outs, tag, branches = self.st.use_cases
         icon = icon_user(ICE).move_to(USER_POS)
         in_rail = rail([[IN_X, OUT_Y, 0], chip.port(LEFT)], DIMC, 2)
         out_rail = rail([chip.port(RIGHT), ANS_IN], DIMC, 2)
         morph(self, VGroup(done, outs, tag, branches), VGroup(icon, in_rail, out_rail))
         self.st.user = user = Chat(CHAT_C, CHAT_W, CHAT_H, tr("CHAT · AI"))
         self.play(FadeTransform(icon, user), run_time=0.55, rate_func=rate_functions.ease_in_out_cubic)
-        q_txt = self.st.user.type_question(self, tr("OUR CAR PARKS · PARIS?"))
-        win = self.st.user.win
-        u_bub = VGroup(self.st.user.q_box, q_txt)
+        q_txt = user.type_question(self, tr("OUR CAR PARKS · PARIS?"))
+        self.st.u_bub = VGroup(user.q_box, q_txt)
         # the question goes from the chat to the chip
         p = packet(ICE)
         send(self, p, [[IN_X, OUT_Y, 0], chip.port(LEFT)], ICE, run_time=0.4)
         self.play(chip.pulse(), FadeOut(p), run_time=0.35)
+        self.st.in_rail, self.st.out_rail = in_rail, out_rail   # reused until the end
+
+    def b_web_guess(self):
+        chip, win = self.st.chip, self.st.user.win
         web = neon(globe(0.42, CYAN).move_to([2.2, 3.05, 0]), CYAN, 1.6)
         web_lbl = L("INTERNET", 11, CYAN, spacing=4).next_to(web, RIGHT, 0.2)
         top = chip.port(UP)
@@ -411,7 +237,7 @@ class Film(StudioScene):
         web_rail = rail(web_pts, CYAN, 1.6)
         mem = L("MEMORY", 11, CYAN, spacing=4).next_to(chip, DOWN, 0.3)
         self.play(Create(web_rail), FadeIn(web), FadeIn(web_lbl), FadeIn(mem), chip.pulse(CYAN),
-                  *self.st.chip.show_pins(("UP", 0)), run_time=0.5)
+                  *chip.show_pins(("UP", 0)), run_time=0.5)
         p = packet(CYAN)
         send(self, p, web_pts + list(reversed(web_pts))[1:], CYAN, run_time=0.55)
         self.remove(p)
@@ -440,14 +266,14 @@ class Film(StudioScene):
         final = VGroup(Text("?", font=LABEL, font_size=32, color=ORANGE),
                        L("SOURCE: WEB", 10, ORANGE, spacing=2)).arrange(RIGHT, buff=0.3).move_to(a_box).set_z_index(5)
         self.play(FadeTransform(cur, final), run_time=0.45)
-        guess = VGroup(u_bub, a_box, final)
-        self.hold(0.5)
-        self.st.user, self.st.in_rail, self.st.out_rail = user, in_rail, out_rail   # reused in act 3
+        guess = VGroup(self.st.u_bub, a_box, final)
         self.st.user.q_box = None
         self.st.intro_bits = VGroup(web, web_lbl, web_rail, mem, guess)
 
-    # --- 02 · Our reality: Paris -------------------------------------------------------------------------------
-    def a2_our_data(self):
+    # =============================================================================================================
+    # 02 · Our reality: Paris, France, the world — then systems and raw tables
+    # =============================================================================================================
+    def b_boundary(self):
         M = MAP_C
         c = M + UP * 0.75
         periph = neon(Ellipse(width=7.6, height=4.2).move_to(c), ManimColor("#1B5C69"), 2)
@@ -468,28 +294,30 @@ class Film(StudioScene):
         self.st.count_lbl = L("OF CAR PARKS", 14, CYAN, spacing=6).move_to(M + [2.0, 3.15, 0], aligned_edge=LEFT)
         # storage: server racks lighting up level after level
         self.st.racks = VGroup(*[rack().move_to(M + [4.75 + 0.52 * (i % 4), 0.85 - 1.27 * (i // 4), 0])
-                              for i in range(12)])
+                                 for i in range(12)])
         self.st.racks_on = 0
         self.st.ev_count, self.st.st_count = self.mag_events(0), self.mag_storage(0)
         self.st.ev_lbl = L("OF EVENTS / DAY", 10, GREEN, spacing=3).move_to(M + [4.55, 2.45, 0], aligned_edge=LEFT)
         self.st.st_lbl = L("STORED", 10, ICE, spacing=3).move_to(M + [4.55, 1.7, 0], aligned_edge=LEFT)
         self.st.rack_lbl = L("DATABASES", 10, GREY_B, spacing=3).next_to(self.st.racks, DOWN, 0.12)\
             .align_to(self.st.racks, LEFT)
-        self.pv(periph, seine, parks, self.st.level_lbl, self.st.count_lbl, self.st.racks, self.st.ev_lbl, self.st.st_lbl,
-                self.st.rack_lbl)
+        self.pv(periph, seine, parks, self.st.level_lbl, self.st.count_lbl, self.st.racks, self.st.ev_lbl,
+                self.st.st_lbl, self.st.rack_lbl)
+        self.st.paris, self.st.parks = VGroup(periph, seine, parks), parks
 
         # 1 → 2: the chip stays at the top (PUBLIC); a dashed boundary opens our PRIVATE world below
         line = DashedLine([-7.1, SPLIT_Y, 0], [7.1, SPLIT_Y, 0], dash_length=0.12).set_stroke(GREY_B, 1.4)
         pub = L("PUBLIC", 11, CYAN, spacing=6).move_to([6.95, SPLIT_Y + 0.2, 0], aligned_edge=RIGHT)
         priv = L("PRIVATE", 11, GREY_B, spacing=6).move_to([6.95, SPLIT_Y - 0.22, 0], aligned_edge=RIGHT)
-        self.play(FadeOut(self.st.intro_bits), Create(line), FadeTransform(self.st.public, pub), FadeIn(priv, shift=DOWN * 0.1),
-                  run_time=1.1)
+        self.play(FadeOut(self.st.intro_bits), Create(line), FadeTransform(self.st.public, pub),
+                  FadeIn(priv, shift=DOWN * 0.1), run_time=1.1)
         self.chapter("02 · OUR REALITY", "Our reality")
         self.st.frontier = VGroup(line, pub, priv)
 
+    def b_unfold(self):
         # our world unfolds: the boundary rises like a screen, the private area rolls out below
-        # and pushes the chip (and the user) up, into the background
-        # the user gets a context: they work at Indigo
+        # and pushes the chip (and the user) up, into the background; the user gets a context: they work at Indigo
+        line, pub, priv = self.st.frontier
         self.st.badge = Badge(self.badge_text(0), self.st.user[0])
         self.play(*self.st.chip.show_pins(("DOWN", 0)), FadeIn(self.st.badge, shift=UP * 0.1), run_time=0.4)
         self.st.pushed = VGroup(self.st.chip, self.st.user, self.st.in_rail, self.st.out_rail, self.st.badge)
@@ -516,6 +344,9 @@ class Film(StudioScene):
         self.play(Flash([beam_top[0], TOP_Y, 0], color=RED, flash_radius=0.22, line_length=0.08, num_lines=8),
                   self.st.chip.pulse(RED), run_time=0.5)
         self.st.unfold = VGroup(panel, scan, glow, beam)
+
+    def b_paris(self):
+        periph, seine, parks = self.st.paris
         self.play(Create(periph), Create(seine), FadeIn(self.st.level_lbl), run_time=1.0)
         self.play(FadeIn(self.st.ev_count), FadeIn(self.st.st_count), FadeIn(self.st.ev_lbl), FadeIn(self.st.st_lbl),
                   FadeIn(self.st.rack_lbl), *self.fill_racks(0), run_time=0.8)
@@ -523,80 +354,8 @@ class Film(StudioScene):
                   FadeIn(self.st.count_lbl), run_time=1.0)
         self.play(LaggedStart(*[Flash(p, color=CYAN, flash_radius=0.26, line_length=0.09, num_lines=6)
                                 for p in parks[::2]], lag_ratio=0.04), run_time=0.6)
-        self.st.paris = VGroup(periph, seine, parks)
-        self.st.parks = parks
 
-    @staticmethod
-    def pp(p):
-        """Map position → position in the private area of the screen."""
-        return PV_DEST + PV_K * (np.array(p) - PV_REF)
-
-    @staticmethod
-    def pv(*mobs):
-        """Place objects built around MAP_C in the private area (below the boundary)."""
-        for m in mobs:
-            m.scale(PV_K, about_point=PV_REF).shift(PV_DEST - PV_REF)
-        return mobs[0] if len(mobs) == 1 else mobs
-
-    def mag_count(self, k):
-        return self.pv(L(PARKS_MAG[k], 22, CYAN, spacing=3, font=TITLE).move_to(MAP_C + [1.85, 3.17, 0],
-                                                                                aligned_edge=RIGHT))
-
-    @staticmethod
-    def fit(m, w=2.35):
-        return m.scale_to_fit_width(w) if m.width > w else m
-
-    def mag_events(self, k):
-        return self.pv(self.fit(L(EVENTS_MAG[k], 16, GREEN, spacing=2, font=TITLE)).move_to(MAP_C + [4.55, 2.72, 0],
-                                                                                            aligned_edge=LEFT))
-
-    def mag_storage(self, k):
-        return self.pv(self.fit(L(STORAGE_MAG[k], 16, ICE, spacing=2, font=TITLE)).move_to(MAP_C + [4.55, 1.97, 0],
-                                                                                          aligned_edge=LEFT))
-
-    def fill_racks(self, k):
-        """Light the racks of level k and grow the orders of magnitude (events, storage)."""
-        n = RACKS[k]
-        new = self.st.racks[self.st.racks_on:n]
-        anims = []
-        if k > 0:
-            ev, st = self.mag_events(k), self.mag_storage(k)
-            anims += [FadeTransform(self.st.ev_count, ev), FadeTransform(self.st.st_count, st)]
-            self.st.ev_count, self.st.st_count = ev, st
-        if len(new):
-            anims.append(LaggedStart(*[FadeIn(r, shift=UP * 0.1) for r in new], lag_ratio=0.15))
-            anims.append(LaggedStart(*[AnimationGroup(r[0].animate.set_stroke(color=CYAN), r[1].animate.set_stroke(ICE),
-                                                      LaggedStart(*[l.animate.set_fill(GREEN, 1) for l in r[2]],
-                                                                  lag_ratio=0.2))
-                                       for r in new], lag_ratio=0.2))
-        self.st.racks_on = n
-        return anims
-
-    def to_servers(self, sources, n=24, seed=0):
-        """While zooming out, data packets leave the map and rush to the lit racks."""
-        rng = np.random.default_rng(seed)
-        racks = [r for r in self.st.racks[:self.st.racks_on]] or [self.st.racks[0]]
-        pk = []
-        for k in range(n):
-            src = sources[int(rng.integers(0, len(sources)))]
-            r = racks[int(rng.integers(0, len(racks)))]
-            d = packet(CYAN).scale(0.55).move_to(src.get_center())
-            pk.append((d, r[2][int(rng.integers(0, 6))].get_center()))
-        self.add(*[d for d, _ in pk])
-        return [LaggedStart(*[d.animate(rate_func=rate_functions.ease_in_out_sine).move_to(t).scale(0.4)
-                              .set_opacity(0) for d, t in pk], lag_ratio=0.03),
-                LaggedStart(*[Indicate(r[2], color=WHITE, scale_factor=1.0) for r in racks], lag_ratio=0.1)]
-
-    def set_level(self, k):
-        new_lbl = L(LEVELS[k], 18, GREY_B, spacing=10).scale(PV_K).move_to(self.st.level_lbl)
-        count = self.mag_count(k)
-        anims = [FadeTransform(self.st.level_lbl, new_lbl), FadeTransform(self.st.count, count), *self.fill_racks(k)]
-        self.st.level_lbl, self.st.count = new_lbl, count
-        return anims
-
-    # --- 02 · … then France and the world -------------------------------------------------------------------
-    def a2_zoom_out(self):
-        M = MAP_C
+    def b_france_world(self):
         rng = np.random.default_rng(11)
         # France: Paris folds into a dot on the map of France
         paris_pt = self.pp(ll(2.35, 48.85, FR_K, FR_C))
@@ -623,9 +382,12 @@ class Film(StudioScene):
                   *self.set_level(2),
                   LaggedStart(Wait(0.5), *[FadeIn(d, scale=0.3) for d in w_dots], lag_ratio=0.04),
                   run_time=1.5, rate_func=rate_functions.ease_in_out_sine)
-        self.hold(0.3)
+        self.st.world = VGroup(world, w_dots)
 
+    def b_tables(self):
         # all this data converges into systems… then tables
+        M = MAP_C
+        world, w_dots = self.st.world
         systems = VGroup()
         for k, name in enumerate(SYSTEMS):
             box = RoundedRectangle(corner_radius=0.06, width=1.95, height=0.5).move_to(M + [-5.4 + 2.16 * k, -2.35, 0])
@@ -663,13 +425,17 @@ class Film(StudioScene):
                   self.st.unfold[0].animate.stretch_to_fit_height(0.01).move_to([0, -4.15, 0]),
                   FadeOut(self.st.unfold[1:]), run_time=2.4)
         self.remove(self.st.unfold)
-        self.hold(0.8)
+
+    def b_vault(self):
+        line, pub, priv = self.st.frontier
         self.play(line.animate.set_stroke(opacity=0.45), pub.animate.set_opacity(0.6), priv.animate.set_opacity(0.6),
                   run_time=0.5)
         self.st.vault = VGroup(line, pub, priv)
 
-    # --- 03 · The problem: the AI wired onto the raw data ---------------------------------------------------------
-    def a3_direct_access(self):
+    # =============================================================================================================
+    # 03 · The problem: the AI wired onto the raw data
+    # =============================================================================================================
+    def b_direct_access(self):
         self.chapter("03 · THE PROBLEM", "The problem")
         self.build_wiring()
         # the question arrives… and the circuit is drawn as it goes down to the tables (direct access)
@@ -683,6 +449,7 @@ class Film(StudioScene):
                   self.st.vault[0].animate.set_stroke(RED, opacity=0.8), FadeIn(direct), run_time=1.2)
         self.play(self.st.vault[0].animate.set_stroke(GREY_B, opacity=0.45), FadeOut(direct), run_time=0.5)
 
+    def b_no_map(self):
         # on the right: with no map, the chip picks straight from the tables (same frame as the act 04 tool call)
         (frame, title), grid, _ = self.table_panel()
         out_lit = self.st.out_rail.copy().set_stroke(RED, 2 * 0.65, 0.9).set_z_index(4)
@@ -694,128 +461,65 @@ class Film(StudioScene):
         self.st.p3, self.st.p3_grid, self.st.p3_rail = VGroup(frame, title), grid, out_lit
         self.st.p3_call, self.st.reply = VGroup(), None
 
-    def build_wiring(self):
-        """Red rails leaving the pins and branching like the tree of definitions."""
-        red = lambda pts: rail(pts, RED, 1.6).set_stroke(opacity=0.75)
-        self.st.seg1, self.st.seg2, self.st.seg3, self.st.cut_pts = VGroup(), VGroup(), [], []
-        self.st.j1_pos, self.st.j2_pos = [], []
-        for i, (pin_k, yb) in enumerate([(1, -0.38), (-1, -0.52)]):
-            p, j1 = self.st.chip.pin(pin_k), J1_POS[i]
-            self.st.seg1.add(red([p, [p[0], yb, 0], [j1[0], yb, 0], j1 + UP * 0.16]))
-            self.st.j1_pos.append(j1)
-            for j in range(2):
-                leaf = 2 * i + j
-                j2 = np.array([j1[0] + (j - 0.5) * 2 * J2_DX, J2_Y, 0])
-                self.st.j2_pos.append(j2)
-                self.st.seg2.add(red([j1 + DOWN * 0.16, [j1[0], j1[1] - 0.38, 0], [j2[0], j1[1] - 0.38, 0],
-                                   j2 + UP * 0.25]))
-                lines = VGroup()
-                for n, ti in enumerate(LEAF_TABLES[leaf]):
-                    t = self.st.tables[ti]
-                    y = -2.35 - 0.12 * ((leaf * 3 + n) % 5)
-                    x0 = j2[0] + (n - (len(LEAF_TABLES[leaf]) - 1) / 2) * 0.12
-                    lines.add(red([[x0, J2_Y - 0.25, 0], [x0, y, 0], [t.get_x(), y, 0], t.get_top()]))
-                    self.st.cut_pts.append(np.array([t.get_x(), (y + t.get_top()[1]) / 2, 0]))
-                self.st.seg3.append(lines)
-        self.st.chaos = VGroup(*self.st.seg1, *self.st.seg2, *self.st.seg3)
-        self.st.joints = VGroup(*[Square(0.12).set_fill(RED, 1).set_stroke(width=0).move_to(p)
-                               for p in self.st.j1_pos + self.st.j2_pos])
-
-    def build_tree(self):
-        """The wiring junctions become the tree nodes (same positions)."""
-        nodes1, nodes2, leaves = VGroup(), VGroup(), VGroup()
-        for i, name in enumerate(TREE_L1):
-            lbl = L(name, 10, ICE, spacing=2)
-            box = RoundedRectangle(corner_radius=0.05, width=lbl.width + 0.3, height=0.32).move_to(self.st.j1_pos[i])
-            nodes1.add(VGroup(neon(box, DIMC, 1.1, fill=BODY), lbl.move_to(box)))
-            for j, name2 in enumerate(TREE_L2):
-                leaf = 2 * i + j
-                lbl2 = VGroup(L(name2, 8, ICE, spacing=2), Text(TREE_LEAVES[leaf], font=TITLE, font_size=14,
-                                                                color=GREY_B)).arrange(DOWN, buff=0.05)
-                box2 = RoundedRectangle(corner_radius=0.05, width=1.2, height=0.5).move_to(self.st.j2_pos[leaf])
-                nodes2.add(VGroup(neon(box2, DIMC, 1.1, fill=BODY), lbl2.move_to(box2)))
-                leaves.add(lbl2[1])
-        return nodes1, nodes2, leaves
-
-    def node_style(self, n, color, f, animate=True):
-        """Colour + intensity of a tree node (neon halo, stroke, fill, text), without flattening the halos."""
-        glow, core = n[0]
-        targets = [(g, dict(color=color, opacity=NEON_OPS[j] * f)) for j, g in enumerate(glow)]
-        targets.append((core, dict(color=color, opacity=f)))
-        out = []
-        for m, kw in targets:
-            out.append(m.animate.set_stroke(**kw) if animate else m.set_stroke(**kw))
-        out.append(core.animate.set_fill(opacity=f) if animate else core.set_fill(opacity=f))
-        ft = max(f, TEXT_DIM)
-        out.append(n[1].animate.set_opacity(ft) if animate else n[1].set_opacity(ft))
-        return out
-
-    def light_path(self, leaf, color):
-        i = leaf // 2
-        n1, n2, lv = self.st.tree
-        dim = [m.animate.set_stroke(RED, 1.6 * 0.65, BOTTOM_DIM) for m in self.st.chaos] + \
-              [a for n in (*n1, *n2) for a in self.node_style(n, DIMC, BOTTOM_DIM)] + \
-              [l.animate.set_color(GREY_B).set_opacity(TEXT_DIM) for l in lv] + \
-              [t[0].animate.set_stroke(DIMC) for t in self.st.tables]
-        lit = [self.st.seg1[i].animate.set_stroke(color, 2.4, 1), self.st.seg2[leaf].animate.set_stroke(color, 2.4, 1),
-               *[m.animate.set_stroke(color, 2.4, 1) for m in self.st.seg3[leaf]],
-               *self.node_style(n1[i], color, 1), *self.node_style(n2[leaf], color, 1),
-               lv[leaf].animate.set_color(color).set_opacity(1),
-               *[self.st.tables[ti][0].animate.set_stroke(color, 2) for ti in LEAF_TABLES[leaf]]]
-        return dim, lit
-
-    def a3_random_guesses(self):
+    def b_first_guess(self):
         self.st.tree = self.build_tree()
         n1, n2, lv = self.st.tree
         for n in (*n1, *n2):  # the tree is born dimmed, like the wiring
             self.node_style(n, DIMC, BOTTOM_DIM, animate=False)
-
         count_txt = L("4 DEFINITIONS → 4 ANSWERS", 11, ORANGE, spacing=3).move_to([0.9, -1.35, 0])
         count = VGroup(BackgroundRectangle(count_txt, color=BLACK, fill_opacity=1, buff=0.04), count_txt)
         amb = VGroup()   # the ambiguity shows in the chat, instead of the 2nd answer
         intro = [LaggedStart(*[ReplacementTransform(self.st.joints[k], n) for k, n in enumerate([*n1, *n2])],
                              lag_ratio=0.08), FadeIn(count),
                  self.st.question.animate.set_color(ORANGE)]
+        self.st.count_txt, self.st.doubts = count_txt, VGroup(*n1, *n2, count, amb)
+        self.st.guess_rng = np.random.default_rng(4)
+        self.guess(0, intro)
 
-        grid = self.st.p3_grid
-        rng = np.random.default_rng(4)
-        for k, leaf in enumerate(TRIES):
-            if k > 0:
-                self.ask(run_time=0.4)
-            picks = LEAF_TABLES[leaf]
-            # the chip picks tables at random: the selection jumps from cell to cell, then stops
-            hops = [int(i) for i in rng.choice([i for i in range(10) if i not in picks], 6, replace=False)]
-            reset = [g[0].animate.set_stroke(DIMC, 1.1, 1) for g in grid] + ([FadeOut(self.st.p3_call)] if k else [])
-            self.play(*reset, run_time=0.2)
-            self.play(Succession(*[grid[i][0].animate(rate_func=there_and_back).set_stroke(ORANGE, 2, 1)
-                                   for i in hops], lag_ratio=1), run_time=0.8)
-            call = self.direct_query(picks)
-            self.play(*[grid[i][0].animate.set_stroke(ORANGE, 2, 1) for i in picks], FadeIn(call, shift=DOWN * 0.1),
-                      run_time=0.4)
-            self.st.p3_call = call
-            dim, lit = self.light_path(leaf, ORANGE)
-            if k == 0:  # 1st attempt: the tree is revealed and the path lights up in the same gesture
-                self.play(*intro, run_time=0.9)
-                self.play(*lit, run_time=0.5)
-            else:
-                self.play(*dim, run_time=0.25)
-                self.play(*lit, run_time=0.5)
-            path = [self.st.seg1[leaf // 2], self.st.seg2[leaf], *self.st.seg3[leaf]]
-            self.play(*[flash_along(m, WHITE, 4, run_time=0.6) for m in path], run_time=0.6)
-            # the answer arrives in the chat, with the randomly picked definition
-            reply = self.chat_reply(GUESSES[k], f"{TREE_L1[leaf // 2]} · {TREE_L2[leaf % 2]}", color=ORANGE)
-            self.play(FadeTransform(self.st.reply, reply) if self.st.reply else FadeIn(reply, shift=UP * 0.1), run_time=0.4)
-            self.st.reply = reply
-            self.hold(0.15)
+    def b_second_guess(self):
+        self.guess(1)
 
+    def guess(self, k, intro=None):
+        """Attempt k: the chip picks tables at random, the tree path lights up, a (wrong) answer reaches the chat."""
+        leaf, grid, rng = TRIES[k], self.st.p3_grid, self.st.guess_rng
+        if k > 0:
+            self.ask(run_time=0.4)
+        picks = LEAF_TABLES[leaf]
+        # the chip picks tables at random: the selection jumps from cell to cell, then stops
+        hops = [int(i) for i in rng.choice([i for i in range(10) if i not in picks], 6, replace=False)]
+        reset = [g[0].animate.set_stroke(DIMC, 1.1, 1) for g in grid] + ([FadeOut(self.st.p3_call)] if k else [])
+        self.play(*reset, run_time=0.2)
+        self.play(Succession(*[grid[i][0].animate(rate_func=there_and_back).set_stroke(ORANGE, 2, 1)
+                               for i in hops], lag_ratio=1), run_time=0.8)
+        call = self.direct_query(picks)
+        self.play(*[grid[i][0].animate.set_stroke(ORANGE, 2, 1) for i in picks], FadeIn(call, shift=DOWN * 0.1),
+                  run_time=0.4)
+        self.st.p3_call = call
+        dim_, lit = self.light_path(leaf, ORANGE)
+        if k == 0:  # 1st attempt: the tree is revealed and the path lights up in the same gesture
+            self.play(*intro, run_time=0.9)
+            self.play(*lit, run_time=0.5)
+        else:
+            self.play(*dim_, run_time=0.25)
+            self.play(*lit, run_time=0.5)
+        path = [self.st.seg1[leaf // 2], self.st.seg2[leaf], *self.st.seg3[leaf]]
+        self.play(*[flash_along(m, WHITE, 4, run_time=0.6) for m in path], run_time=0.6)
+        # the answer arrives in the chat, with the randomly picked definition
+        reply = self.chat_reply(GUESSES[k], f"{TREE_L1[leaf // 2]} · {TREE_L2[leaf % 2]}", color=ORANGE)
+        self.play(FadeTransform(self.st.reply, reply) if self.st.reply else FadeIn(reply, shift=UP * 0.1), run_time=0.4)
+        self.st.reply = reply
+
+    def b_ambiguous(self):
         # no definition is enforced: anything is possible, so nothing is reliable
+        n1, n2, lv = self.st.tree
+        grid = self.st.p3_grid
         amb_sub = L("AMBIGUOUS", 12, RED, spacing=6)
         amb_sub.next_to(self.chapter_lbl, DOWN, 0.14).align_to(self.chapter_lbl, LEFT).set_z_index(30)
         self.play(*[m.animate.set_stroke(RED, 1.6 * 0.65, BOTTOM_DIM) for m in self.st.chaos],
                   *[a for n in (*n1, *n2) for a in self.node_style(n, RED, BOTTOM_DIM)],
                   *[l.animate.set_color(RED).set_opacity(TEXT_DIM) for l in lv],
                   *[t[0].animate.set_stroke(DIMC) for t in self.st.tables],
-                  count_txt.animate.set_color(RED), self.st.reply[0].animate.set_stroke(color=RED),
+                  self.st.count_txt.animate.set_color(RED), self.st.reply[0].animate.set_stroke(color=RED),
                   self.st.reply[1].animate.set_color(RED), FadeOut(self.st.p3_rail),
                   *[grid[i][0].animate.set_stroke(RED, 2, 1) for i in LEAF_TABLES[TRIES[-1]]],
                   *[c[0].animate.set_stroke(RED) for c in self.st.p3_call[0]],
@@ -827,10 +531,8 @@ class Film(StudioScene):
             self.play(self.st.reply.animate.shift(RIGHT * 0.06), run_time=0.04)
             self.play(self.st.reply.animate.shift(LEFT * 0.12), run_time=0.04)
             self.play(self.st.reply.animate.shift(RIGHT * 0.06), run_time=0.04)
-        self.hold(0.6)
-        self.st.doubts = VGroup(*n1, *n2, count, amb)
 
-    def a3_ambiguity(self):
+    def b_semantic_layer(self):
         self.st.mcp = Band(13.2, 1.08, [0, BAND_Y, 0], tr("MCP"), tr("MODEL CONTEXT PROTOCOL"))
         band = self.st.mcp.shape
         c, w, h = FRAME
@@ -856,15 +558,19 @@ class Film(StudioScene):
         # 3 · they merge into "SEMANTIC LAYER"…
         s1_mid = s1.copy().scale(1.25).move_to(mid)
         self.play(FadeTransform(VGroup(*qs), s1_mid), run_time=0.6)
-        self.hold(0.4)
-        # 4 · … which rises to become the band title, the question takes its place
-        sub1 = L("WHAT DOES OUR DATA MEAN?", 14, ICE, spacing=4).move_to(mid)
-        self.play(TransformFromCopy(s1_mid, sub1), ReplacementTransform(s1_mid, s1), run_time=0.8)
-        self.hold(0.9)
-        self.st.sens_sub, self.st.sens_lbl = sub1, s1
+        self.st.sens_lbl, self.st.sens_mid = s1, s1_mid
 
-    # --- 04 · MCP: meaning ---------------------------------------------------------------------------------------
-    def a4_semantic_layer(self):
+    def b_our_question(self):
+        # 4 · … which rises to become the band title, the question takes its place
+        s1, s1_mid = self.st.sens_lbl, self.st.sens_mid
+        sub1 = L("WHAT DOES OUR DATA MEAN?", 14, ICE, spacing=4).move_to(self.st.band_shape.get_center())
+        self.play(TransformFromCopy(s1_mid, sub1), ReplacementTransform(s1_mid, s1), run_time=0.8)
+        self.st.sens_sub = sub1
+
+    # =============================================================================================================
+    # 04 · What does our data mean? The MCP: meaning
+    # =============================================================================================================
+    def b_meaning(self):
         band = self.st.mcp.frame()
         label = self.st.mcp.label.move_to([-5.75, BAND_Y, 0])
         # the question finds its answer: the band turns green… then becomes the MCP
@@ -884,6 +590,7 @@ class Film(StudioScene):
         self.remove(self.st.chaos)
         self.st.band, self.st.band_label = band, label
 
+    def b_domains(self):
         # 5 domains, each wired straight to its tables (no tools on screen)
         nodes = VGroup()
         for name, src in CONCEPTS:
@@ -891,18 +598,18 @@ class Film(StudioScene):
             box = RoundedRectangle(corner_radius=0.06, width=max(lbl.width + 0.3, 1.2), height=0.38)
             nodes.add(VGroup(neon(box, CYAN, 1.4, fill=BODY), lbl.move_to(box)))
         nodes.arrange(RIGHT, buff=0.28)
-        nodes.move_to([(label.get_right()[0] + 0.3 + self.st.band_shape.get_right()[0] - 0.25) / 2, BAND_Y, 0])
+        nodes.move_to([(self.st.band_label.get_right()[0] + 0.3 + self.st.band_shape.get_right()[0] - 0.25) / 2,
+                       BAND_Y, 0])
         for n in nodes:
             n[1].set_z_index(2)
         self.play(LaggedStart(*[ReplacementTransform(self.st.tables[src][1].copy(), n[1], path_arc=-PI / 4)
                                 for (name, src), n in zip(CONCEPTS, nodes)], lag_ratio=0.15), run_time=1.4)
-        domain_tables = CONCEPT_TABLES
         # right-angle circuit rails: down, horizontal run (one level per rail), down to the table
         y_hi = self.st.band_shape.get_bottom()[1] - 0.06
         y_lo = self.st.tables[0].get_top()[1] + 0.08
-        n_roots = sum(len(t) for t in domain_tables)
+        n_roots = sum(len(t) for t in CONCEPT_TABLES)
         roots, k = VGroup(), 0
-        for i, tbls in enumerate(domain_tables):
+        for i, tbls in enumerate(CONCEPT_TABLES):
             for n, tbl in enumerate(tbls):
                 x0 = nodes[i].get_x() + (n - (len(tbls) - 1) / 2) * 0.14
                 y = y_hi - (y_hi - y_lo) * (k + 0.5) / n_roots
@@ -930,13 +637,16 @@ class Film(StudioScene):
         self.play(*[m.animate.set_stroke(opacity=0.25) for m in (*paths, self.st.trunk)], run_time=0.4)
         self.st.nodes, self.st.roots = nodes, VGroup(roots)
 
+    def b_tool_call(self):
         # call: chip → MCP → the right domain → its table; the path is drawn and stays lit
+        roots = self.st.roots[0]
         used_k = CONCEPT_TABLES[SEL][0]
         occ, used = self.st.nodes[SEL], self.st.tables[used_k]
-        link = roots[sum(len(t) for t in domain_tables[:SEL])]
+        link = roots[sum(len(t) for t in CONCEPT_TABLES[:SEL])]
         lit = VGroup(*[m.copy().set_stroke(WHITE, 2.4 * 0.65, 1) for m in (self.st.trunk, rail(self.st.bus_pts[SEL]), link)])
         lit.set_z_index(4)
-        others = [*[n for k, n in enumerate(self.st.nodes) if k != SEL], *[t for k, t in enumerate(self.st.tables) if k != used_k]]
+        others = [*[n for k, n in enumerate(self.st.nodes) if k != SEL],
+                  *[t for k, t in enumerate(self.st.tables) if k != used_k]]
 
         # on the right, the old answer makes way for the tool call panel, linked to the chip
         panel, steps = self.tool_panel()
@@ -965,9 +675,14 @@ class Film(StudioScene):
         self.play(FadeTransform(self.st.reply, reply), occ[0].animate.set_stroke(color=CYAN), run_time=0.5)
         self.st.lit, self.st.reply = VGroup(lit, out_lit), reply
         self.st.mini = VGroup(panel, *steps)
-        self.hold(0.9)
+        self.st.tool_steps, self.st.used_table = steps, used
 
+    def b_second_ask(self):
         # same question, new attempt: the conversation continues in the chat (like a real chat)
+        lit, out_lit = self.st.lit
+        steps = self.st.tool_steps
+        grid = steps[0]
+        roots = self.st.roots[0]
         alt = 0
         first = self.st.reply
         q2 = Chat.bubble(tr(QUESTION))
@@ -993,7 +708,7 @@ class Film(StudioScene):
         call2[0][0].set_stroke(ORANGE, 1.6, 1)
         call2[0][1].set_color(ORANGE).set_opacity(1)
         call2[0][0].set_fill(BODY, 1)
-        alt_link = roots[sum(len(t) for t in domain_tables[:alt])]
+        alt_link = roots[sum(len(t) for t in CONCEPT_TABLES[:alt])]
         lit2 = VGroup(*[m.copy().set_stroke(ORANGE, 2.4 * 0.65, 1) for m in (self.st.trunk, rail(self.st.bus_pts[alt]), alt_link)])
         lit2.set_z_index(5)
         alt_t = self.st.tables[CONCEPT_TABLES[alt][0]]
@@ -1017,11 +732,18 @@ class Film(StudioScene):
         bracket.set_z_index(5)
         neq.set_z_index(5)
         self.play(Create(bracket), FadeIn(neq, scale=1.4), first.animate.set_opacity(1), run_time=0.4)
-        self.hold(0.6)
+        self.st.second = VGroup(lit2, alt_t, call2, wrong)
+        self.st.chat_extra = VGroup(first, q2, bracket, neq)
+
+    def b_data(self):
         # end of the act: the activated circuits are dimmed again
         # the lit copies disappear: only the dimmed base rail remains (no stacked layers)
+        lit, out_lit = self.st.lit
+        lit2, alt_t, call2, wrong = self.st.second
+        alt, occ, steps = 0, self.st.nodes[SEL], self.st.tool_steps
+        panel, grid = self.st.mini[0], steps[0]
         self.play(FadeOut(lit), FadeOut(lit2), FadeOut(out_lit), alt_t[0].animate.set_stroke(DIMC, 1.5),
-                  used[0].animate.set_stroke(DIMC, 1.5), self.st.nodes[alt][0].animate.set_stroke(color=CYAN),
+                  self.st.used_table[0].animate.set_stroke(DIMC, 1.5), self.st.nodes[alt][0].animate.set_stroke(color=CYAN),
                   occ[0].animate.set_stroke(color=CYAN), run_time=0.5)
         # the MCP is explained: the tables (and the public / private boundary) condense into one DATA rectangle
         dbox, data = data_block(self.st.band_shape.width, [0, DATA_Y, 0], tr("DATA"))
@@ -1029,116 +751,18 @@ class Film(StudioScene):
         self.st.tables, self.st.roots, self.st.vault, self.st.data_box = VGroup(data), VGroup(), VGroup(), dbox
         self.st.reply, self.st.lit_ok, self.st.lit = wrong, VGroup(lit[0], lit[1]), VGroup(VGroup(), VGroup())
         self.st.p4_alt = alt
-        self.st.chat_extra = VGroup(first, q2, bracket, neq)
         self.st.mini = VGroup(panel, grid, VGroup(call2, steps[1][1]))
 
-    def llm_sends(self, chip_m, target, color):
-        """The AI sends its choice: the pill leaves the chip, follows the line to the panel and lands."""
-        fly = chip_m.copy().scale(0.85)
-        x_in = ANS_IN[0] + 0.12
-        route = [self.st.chip.port(RIGHT), [x_in, OUT_Y, 0], [x_in, target.get_y(), 0], target.get_left() + LEFT * 0.05]
-        send(self, fly, route, color, run_time=0.8)
-        self.play(fly.animate.scale(1 / 0.85).move_to(target), run_time=0.25)
-        self.remove(fly)
-        self.add(target)
-
-    def panel_frame(self, text, icon, color, h=2.9):
-        """Shared frame of the right-hand panels (act 03: no map · act 04: tool call · act 05: tools)."""
-        return panel_frame(ANS_IN[0], OUT_Y - 0.4, tr(text), icon, color, h=h)
-
-    def table_panel(self):
-        """Act 03: the 10 raw tables the chip picks from at random."""
-        die = RoundedRectangle(corner_radius=0.05, width=0.24, height=0.24).set_stroke(ORANGE, 1.4)
-        die = VGroup(die, *[Dot(die.get_center() + d * 0.06, radius=0.018, color=ORANGE) for d in (UL, ORIGIN, DR)])
-        box, frame, title = self.panel_frame("NO MAP", die, ORANGE)
-        grid = VGroup()
-        for name in TABLES:
-            b = RoundedRectangle(corner_radius=0.04, width=1.15, height=0.22).set_stroke(DIMC, 1.1, 1).set_fill(BODY, 1)
-            t = T_(name, font=MONO, font_size=8, color=ICE)
-            grid.add(VGroup(b, t.move_to(b).set_z_index(2)))
-        grid.arrange_in_grid(5, 2, buff=(0.1, 0.06)).move_to(box.get_center() + UP * 0.2)
-        self.st.p3_box = box
-        return (frame, title), grid, None
-
-    def direct_query(self, picks):
-        """Act 03: the query goes to the picked tables, with no definition."""
-        chips = VGroup()
-        for i in picks:
-            t = T_(TABLES[i], font=MONO, font_size=7, color=ORANGE)
-            b = RoundedRectangle(corner_radius=0.04, width=t.width + 0.12, height=0.2).set_stroke(ORANGE, 1, 1)
-            chips.add(VGroup(b.set_fill(BODY, 1), t.move_to(b).set_z_index(2)))
-        chips.arrange(RIGHT, buff=0.06)
-        lbl = L("DIRECT QUERY", 7, GREY_B, spacing=2)
-        call = VGroup(chips, lbl).arrange(DOWN, buff=0.1)
-        return call.move_to(self.st.p3_box.get_bottom() + UP * 0.38).set_z_index(3)
-
-    def tool_panel(self):
-        """Tool call panel, on the right (instead of the answer box): ① domains ② choice ③ call."""
-        box, frame, title = self.panel_frame("TOOL CALL", icon_tool_card(CYAN).scale(0.55).set_z_index(0), CYAN)
-        grid = self.domain_grid().move_to(box.get_center() + UP * 0.45)
-        pills = VGroup(*[VGroup(RoundedRectangle(corner_radius=0.06, width=0.5, height=0.22).set_fill(CYAN, 0.18)
-                                .set_stroke(CYAN, 1, 0.8), L(t, 7, ICE, spacing=1)) for t in ("PARIS", "09/26")])
-        for pl in pills:
-            pl[1].move_to(pl[0]).set_z_index(2)
-        call = VGroup(grid[SEL].copy(), *pills).arrange(RIGHT, buff=0.06).move_to(box.get_center() + DOWN * 0.72)
-        call[0][0].set_stroke(CYAN, 1.6, 1)
-        sent = L("SENT TO MCP", 7, GREY_B, spacing=2).next_to(call, DOWN, 0.12)
-        return VGroup(frame, title), [grid, VGroup(call, sent)]
-
-    def tools_strip(self):
-        """Harness TOOLS step: a wide, low strip sitting on the chip, with the MCP domains."""
-        w, h = self.st.box_shape.width - 0.3, TOOLS_H
-        box = RoundedRectangle(corner_radius=0.12, width=w, height=h)
-        box.move_to([self.st.box_shape.get_x(), self.st.chip.get_top()[1] + 0.12 + h / 2, 0])
-        frame = neon(box, ORANGE, 1.4, fill=BODY).set_z_index(6)
-        title = VGroup(icon_list(ORANGE).scale(1.2), L("TOOLS", 10, ORANGE, spacing=4)).arrange(RIGHT, buff=0.12)
-        title.move_to(box.get_corner(UL) + np.array([0.2, -0.24, 0]), aligned_edge=LEFT).set_z_index(7)
-        cw = (w - 0.3 - 4 * 0.08) / 5
-        grid = VGroup()
-        for name, _ in CONCEPTS:
-            words = tr(name).split()
-            if len(words) > 1:  # long name: on two lines, split as evenly as possible
-                k = min(range(1, len(words)), key=lambda i: abs(len(" ".join(words[:i])) - len(" ".join(words[i:]))))
-                lbl = VGroup(L(" ".join(words[:k]), 9, CYAN, spacing=2), L(" ".join(words[k:]), 9, CYAN, spacing=2))
-                lbl.arrange(DOWN, buff=0.06)
-            else:
-                lbl = L(words[0], 9, CYAN, spacing=2)
-            if lbl.width > cw - 0.12:
-                lbl.scale_to_fit_width(cw - 0.12)
-            b_ = RoundedRectangle(corner_radius=0.05, width=cw, height=0.46).set_stroke(CYAN, 1.1, 0.8).set_fill(BODY, 1)
-            grid.add(VGroup(b_, lbl.move_to(b_)))
-        grid.arrange(RIGHT, buff=0.08)
-        grid.move_to([box.get_x(), box.get_top()[1] - 0.48 - 0.23, 0]).set_z_index(7)
-        return VGroup(frame, title, grid, box)
-
-    def domain_grid(self):
-        """The MCP domains as pills (right-hand panels)."""
-        grid = VGroup()
-        for name, _ in CONCEPTS:
-            lbl = L(name, 7, CYAN, spacing=1)
-            b = RoundedRectangle(corner_radius=0.05, width=1.2, height=0.28).set_stroke(CYAN, 1.1, 0.8).set_fill(BODY, 1)
-            if lbl.width > 1.1:
-                lbl.scale_to_fit_width(1.1)
-            grid.add(VGroup(b, lbl.move_to(b).set_z_index(2)))
-        return grid.arrange_in_grid(3, 2, buff=(0.1, 0.08), flow_order="rd")
-
-    def chat_reply(self, main, sub, color=CYAN):
-        """AI answer in the chat window, left-aligned below the question."""
-        return self.st.user.reply(main, tr(sub), color)
-
-    def badge_text(self, k):
-        return " · ".join(tr(x) for x in USER_CTX[k])
-
-
-    # --- 05 · Harness: the code becomes a frame around the chip ---------------------------------------------------
-    def a5_build_harness(self):
+    # =============================================================================================================
+    # 05 · Harness: the code becomes a frame around the chip
+    # =============================================================================================================
+    def b_harness_frame(self):
         self.chapter("05 · HARNESS → TRUST", "Harness: trust")
-        self.st.background = [self.st.band, self.st.band_label, self.st.nodes, self.st.bus, self.st.trunk, self.st.lit, self.st.roots,
-                           self.st.tables, self.st.vault, self.st.sens_lbl]
+        self.st.background = [self.st.band, self.st.band_label, self.st.nodes, self.st.bus, self.st.trunk, self.st.lit,
+                              self.st.roots, self.st.tables, self.st.vault, self.st.sens_lbl]
         # inside the harness the chip gets a little smaller: one step among others
         self.play(dim(self.st.background, 0.3), FadeOut(self.st.lit[1]), FadeOut(self.st.chat_extra[2:]),
                   self.st.chip.animate.scale(CHIP_IN_HARNESS), run_time=0.5)
-
         self.st.chip.size *= CHIP_IN_HARNESS   # the pins (port) follow the new size
         # the harness frame is drawn around the chip; the tool call panel becomes its TOOLS step
         self.st.gates = VGroup()
@@ -1159,12 +783,14 @@ class Film(StudioScene):
         label = L("HARNESS", 20, ORANGE, spacing=10).move_to([title_x, 3.68, 0])
         strip = self.tools_strip()
         pan, grid4, calls = self.st.mini
-        self.play(Create(frame), FadeIn(label), 
+        self.play(Create(frame), FadeIn(label),
                   ReplacementTransform(pan[0], strip[0]), FadeTransform(pan[1], strip[1]),
                   *[ReplacementTransform(g, s_) for g, s_ in zip(grid4, strip[2])], FadeOut(calls), run_time=1.2)
-        self.st.strip = strip
+        self.st.strip, self.st.frame, self.st.frame_label = strip, frame, label
+
+    def b_tested(self):
         self.st.code = CodeFile(self.st.box_shape.get_right()[0] + 0.25, FW / 2 - 0.2, OUT_Y - 0.15, RUN_LINES,
-                             tr("harness.py"))
+                                tr("harness.py"))
         bgs = self.st.code[3]
         self.st.code.lines.set_opacity(0)   # the code is not readable yet: it shows as a "matrix" while the tests run
         bgs.set_opacity(0)
@@ -1205,99 +831,23 @@ class Film(StudioScene):
         bgs.set_fill(opacity=0.85)
         self.st.tests = tests
 
+    def b_locked(self):
         # the harness locks: input, output and data access
-        clamps = harness_clamps(box, OUT_Y, CHIP_POS[0])
+        clamps = harness_clamps(self.st.box_shape, OUT_Y, CHIP_POS[0])
         self.play(LaggedStart(*[GrowFromCenter(c) for c in clamps], lag_ratio=0.2),
-                  Flash(frame, color=ORANGE, flash_radius=3.2, num_lines=16), run_time=0.8)
-        self.hold(0.5)
-        self.st.frame, self.st.frame_label, self.st.clamps, self.st.tag = frame, label, clamps, VGroup()
+                  Flash(self.st.frame, color=ORANGE, flash_radius=3.2, num_lines=16), run_time=0.8)
+        self.st.clamps, self.st.tag = clamps, VGroup()
 
-        self.hold(0.4)
-
-    def add_log(self, text, color):
-        if self.st.condensed:  # the audit log becomes just an icon
-            return Wait(0.01)
-        entry = T_(text, font=MONO, font_size=11, color=color)
-        entry.move_to(self.st.log_top + DOWN * 0.25 * len(self.st.logs), aligned_edge=UL)
-        self.st.logs.add(entry)
-        return FadeIn(entry, shift=UP * 0.1)
-
-    def gate_state(self, g, color):
-        return [g[0].animate.set_stroke(color=color), g[1].animate.set_color(color)]
-
-    def reset_gates(self):
-        return [a for g in self.st.gates for a in self.gate_state(g, ORANGE)]
-
-    def check(self, k, ok=True):
-        """A module runs: its own visual effect + colour."""
-        g = self.st.gates[k]
-        c = g[0].get_center()
-        fx = []
-        if k == 0:  # format: a beam sweeps the module
-            beam = Line(UP * 0.36, DOWN * 0.36).set_stroke(GREEN, 3).move_to(c + LEFT * 0.3)
-            self.add(beam)
-            fx = [beam.animate.shift(RIGHT * 0.6).set_stroke(opacity=0)]
-        elif k == 1:  # scope: a ripple
-            fx = [Broadcast(Circle(0.28, color=GREEN, stroke_width=2), focal_point=c, n_mobs=2)]
-        elif k == 2 and ok:  # rights: the padlock opens
-            fx = [g[1].animate(rate_func=there_and_back).shift(UP * 0.07)]
-        anims = self.st.code.step(GATE_LINE[k]) if self.st.code is not None else []
-        return [*self.gate_state(g, GREEN if ok else RED), *fx, *anims]
-
-
-    def ask_format(self):
-        """The question enters the harness: FORMAT checks it before it reaches the chip."""
-        p = packet(ICE)
-        g0 = self.st.gates[0][0].get_center()
-        send(self, p, [[IN_X, OUT_Y, 0], g0], ICE, run_time=0.35)
-        self.play(*self.check(0), run_time=0.35)
-        send(self, p, [g0, self.st.chip.port(LEFT)], GREEN, run_time=0.3)
-        self.play(self.st.chip.pulse(), FadeOut(p), run_time=0.4)
-
-    def run(self, call_text, log, to_chat=False, ask=True, scope=None):
-        """Question → chip → checked tool call → MCP → chip → checked answer → user."""
-        if ask:
-            self.ask_format()
-            self.play(*self.st.code.step(1), Flash(self.st.strip[2][SEL], color=ORANGE, flash_radius=0.5), run_time=0.35)
-        p = packet(CYAN)
-        top = self.st.chip.port(DOWN)
-        g1, g2 = self.st.gates[1][0].get_center(), self.st.gates[2][0].get_center()
-        send(self, p, [top, g1], CYAN, run_time=0.3)
-        if scope is not None:  # SCOPE does not know the zone: it calls the user's rights
-            self.scope_lookup(scope)
-        self.play(*self.check(1), run_time=0.35)
-        send(self, p, [g1, g2], CYAN, run_time=0.3)
-        self.play(*self.check(2), run_time=0.3)
-        node = self.st.nodes[SEL]
-        path = [g2, [CHIP_POS[0], BUS_Y, 0]] + self.st.bus_pts[SEL][1:]
-        # the call reaches the MCP: the semantic layer lights up (the rails stay subtle)
-        paths = [self.st.bus, self.st.trunk, self.st.lit, self.st.roots]
-        rest = [m for m in self.st.background if all(m is not p_ for p_ in paths)]
-        self.play(dim(rest, 1.0), dim(paths, 0.45), *self.st.code.step(4), run_time=0.35)
-        send(self, p, path, CYAN, run_time=0.6)
-        self.play(Flash(node, color=CYAN, flash_radius=0.8), run_time=0.35)
-        # the MCP fetches the data, then goes back up
-        down = [node.get_bottom(), [node.get_x(), self.st.data_box.get_top()[1], 0]]
-        send(self, p, down, CYAN, run_time=0.35)
-        self.play(Flash(p, color=CYAN, flash_radius=0.5, num_lines=8), run_time=0.3)
-        send(self, p, list(reversed(down)), CYAN, run_time=0.35)
-        send(self, p, list(reversed(path)) + [top], CYAN, run_time=0.7)
-        self.play(self.st.chip.pulse(CYAN), run_time=0.35)
-        g3 = self.st.gates[3][0].get_center()
-        send(self, p, [self.st.chip.port(RIGHT), g3], GREEN, run_time=0.4)
-        self.play(*self.check(3), self.add_log(*log), run_time=0.35)
-        if not to_chat:
-            send(self, p, [g3, ANS_IN], GREEN, run_time=0.35)
-        self.play(FadeOut(p, scale=0.3), run_time=0.15)
-
-    def a5_scoped_question(self):
+    def b_director_asks(self):
+        self.hold(0.4)   # the harness is built: a breath before the new question
         # harness TOOLS step, above the chip: it extracts the question's context, then checks the tools
         alt = self.st.p4_alt
         # new conversation: the chat empties and shrinks back, the same question is asked to the harness
         old = VGroup(self.st.chat_extra[:2], self.st.reply, self.st.user.q_box, self.st.question)
         self.play(old.animate.shift(UP * 0.3).set_opacity(0),
                   Transform(self.st.user[0], neon(self.st.user.win, ICE, 1.6, fill=BODY).set_z_index(3)),
-                  self.st.badge.animate.next_to(self.st.user.win, DOWN, 0.16).align_to(self.st.user.win, LEFT).shift(RIGHT * 0.1),
+                  self.st.badge.animate.next_to(self.st.user.win, DOWN, 0.16).align_to(self.st.user.win, LEFT)
+                  .shift(RIGHT * 0.1),
                   self.st.nodes[alt][0].animate.set_stroke(color=CYAN), FadeOut(self.st.lit[0]),
                   run_time=0.5)
         self.remove(old)
@@ -1332,7 +882,10 @@ class Film(StudioScene):
         self.play(descs[SEL].animate.set_color(ORANGE), grid[SEL][0].animate.set_stroke(ORANGE, 2, 1),
                   Flash(grid[SEL], color=ORANGE, flash_radius=0.6, num_lines=10),
                   run_time=0.5)
-        self.hold(0.6)
+        self.st.descs = VGroup(descs, scan)
+
+    def b_scoped_call(self):
+        descs, scan = self.st.descs
         self.play(FadeOut(VGroup(descs, scan)), descs[SEL].animate.set_color(GREY_B), run_time=0.4)
         self.run(CALL_OK, ("09:14 sessions · west OK", GREEN), to_chat=True, ask=False, scope=self.st.badge)
         right = self.chat_reply(tr("0.31 M"), tr("OFF-STREET · WEST ZONE · 09/26"), color=GREEN)
@@ -1340,19 +893,12 @@ class Film(StudioScene):
         self.play(FadeIn(right, shift=UP * 0.1), Create(self.st.ok), Flash(right, color=GREEN, flash_radius=1.0),
                   FadeIn(self.st.lit_ok.set_stroke(CYAN, opacity=1)), run_time=0.6)
         self.st.reply = right
-        self.hold(1.0)
 
-    # --- End of act 05: the view condenses ------------------------------------------------------------------------
-    def a5_condense(self):
-        """End of act 05: the demonstration is done, the view condenses."""
-        self.hold(0.8)
+    def b_condense(self):
+        """Everything is explained: the detail condenses into icons (big picture)."""
+        self.hold(0.8)   # the demonstration is done
         self.play(*self.reset_gates(), FadeOut(self.st.lit_ok), run_time=0.4)
-        self.condense()
-
-    def condense(self):
-        """End of act 05: everything is explained, the detail condenses into icons (big picture)."""
         chip, old = self.st.chip, self.st.box_shape
-
         log_m = Module(icon_log(ORANGE), [chip.get_right()[0] + 0.6, OUT_Y, 0])
         left, right = old.get_left()[0], log_m.get_right()[0] + 0.4
         top, bottom = chip.get_top()[1] + 0.65, old.get_bottom()[1]   # no more TOOLS step in the frame
@@ -1376,7 +922,8 @@ class Film(StudioScene):
         self.play(Transform(self.st.frame, neon(box, ORANGE, 2)), self.st.clamps[1].animate.move_to([R_, OUT_Y, 0]),
                   FadeOut(VGroup(self.st.strip[0], self.st.strip[1], self.st.strip[2])),
                   FadeTransform(VGroup(self.st.gates[3], self.st.logs), log_m), FadeOut(self.st.scope_pill),
-                  FadeOut(self.st.code, scale=0.4, target_position=tag), FadeIn(tag, scale=1.6), Transform(label, lbl_t), Transform(self.st.tests, tests_t),
+                  FadeOut(self.st.code, scale=0.4, target_position=tag), FadeIn(tag, scale=1.6), Transform(label, lbl_t),
+                  Transform(self.st.tests, tests_t),
                   Transform(self.st.band, neon(band, CYAN, 2, fill=ManimColor("#021B21"))),
                   FadeOut(self.st.nodes), Transform(self.st.band_label, mcp_lbl), FadeOut(self.st.sens_lbl),
                   FadeOut(self.st.bus), FadeOut(self.st.roots), Transform(self.st.trunk, trunk),
@@ -1385,27 +932,11 @@ class Film(StudioScene):
         self.st.box_shape, self.st.band_shape = box, band
         self.st.bus, self.st.roots, self.st.nodes, self.st.tables = VGroup(), VGroup(link), VGroup(), VGroup(db)
         self.st.tools_icon, self.st.tag, self.st.condensed = VGroup(), tag, True
-        self.hold(1.0)
 
-    def scope_lookup(self, badge):
-        """SCOPE calls for the user's scope; the zone comes back and attaches to the module."""
-        g = self.st.gates[1][0]
-        x = (self.st.box_shape.get_left()[0] + self.st.user.win.get_right()[0]) / 2
-        route = [g.get_left(), [x, g.get_y(), 0], [x, badge.get_y(), 0], badge.get_right() + RIGHT * 0.08]
-        q = packet(ORANGE)
-        send(self, q, route, ORANGE, run_time=0.6)
-        self.play(FadeOut(q), Flash(badge[0], color=ORANGE, flash_radius=0.35, num_lines=8),
-                  *self.st.badge.grow(self.badge_text(2)), run_time=0.5)
-        txt = L("WEST ZONE", 8, ORANGE, spacing=2)
-        box = RoundedRectangle(corner_radius=0.06, width=txt.width + 0.22, height=0.24)
-        pill = VGroup(box.set_fill(BODY, 1).set_stroke(ORANGE, 1.2, 1), txt.move_to(box)).set_z_index(8)
-        dest = g.get_right() + RIGHT * (0.2 + pill.width / 2)
-        send(self, pill, list(reversed(route)) + [dest], ORANGE, run_time=0.8)
-        self.st.scope_pill = pill
-
-    # --- 06 · Together -------------------------------------------------------------------------------------------
-    def a6_together(self):
-        """Big picture: chat → harness → MCP → data; the answer becomes tables, charts, reports."""
+    # =============================================================================================================
+    # 06 · Together: chat → harness → MCP → data; the answer becomes tables, charts, reports; end on words
+    # =============================================================================================================
+    def b_big_picture(self):
         self.chapter("06 · TOGETHER", "Together")
         box, band = self.st.box_shape, self.st.band_shape
         # the harness is explained: no more detail inside, only the frame around the AI
@@ -1415,7 +946,10 @@ class Film(StudioScene):
                   *[flash_along(r, WHITE, 5, run_time=0.9) for r in self.st.roots], self.st.chip.pulse(), run_time=0.9)
         self.play(flash_along(box, ORANGE, 6, time_width=0.4, run_time=0.8),
                   flash_along(band, CYAN, 6, time_width=0.4, run_time=0.8), run_time=0.8)
+
+    def b_deliverables(self):
         # on the right: the answer turns into deliverables
+        box = self.st.box_shape
         bars = VGroup(*[Rectangle(width=0.1, height=h).set_fill(GREEN, 0.8).set_stroke(width=0)
                         for h in (0.18, 0.32, 0.24, 0.42)]).arrange(RIGHT, buff=0.05, aligned_edge=DOWN)
         outs = VGroup()
@@ -1427,15 +961,19 @@ class Film(StudioScene):
         self.play(src.animate.move_to(outs).scale(0.8), run_time=0.7)
         self.play(FadeOut(src, scale=0.6), LaggedStart(*[FadeIn(o, scale=0.8) for o in outs], lag_ratio=0.2),
                   run_time=0.9)
+        self.st.outs = outs
+
+    def b_back_to_user(self):
         # sent back to the user, in all these forms: they arrive in the chat
-        back = VGroup(*[o[0].copy() for o in outs])
+        back = VGroup(*[o[0].copy() for o in self.st.outs])
         dest = back.copy().scale(0.45).arrange(RIGHT, buff=0.22)
         dest.next_to(self.st.reply, DOWN, 0.06).align_to(self.st.reply, LEFT).set_z_index(6)
         back.set_z_index(6)
         self.play(LaggedStart(*[b.animate(path_arc=PI / 5).move_to(d).scale(0.45) for b, d in zip(back, dest)],
                               lag_ratio=0.15), flash_along(self.st.in_rail, GREEN, 5, run_time=1.0), run_time=1.1)
         self.play(Flash(self.st.user[0], color=GREEN, flash_radius=1.9, num_lines=14), run_time=0.7)
-        self.hold(1.0)
+
+    def b_trust_meaning(self):
         # last shot: the rectangles disappear and become the words that sum up the film
         w1 = L("TRUST", 26, ORANGE, spacing=10)
         w2 = L("SEMANTIC LAYER", 26, CYAN, spacing=10)
@@ -1450,12 +988,13 @@ class Film(StudioScene):
         # the three blocks re-centre, then turn into words
         # the harness becomes TRUST; the MCP becomes SEMANTIC LAYER, then UNDERSTANDING
         words_from_blocks(self, [(harness, w1), (mcp, w2)], fade=[data], center=[0, 0.2, 0])
-        self.hold(1.0)
+        self.st.words = VGroup(w1, w2, w3)
+
+    def b_understanding(self):
+        w1, w2, w3 = self.st.words
         und = L("UNDERSTANDING", 26, CYAN, spacing=10).move_to(w2)
         self.play(FadeTransform(w2, und), run_time=0.9)
-        self.hold(0.6)
+
+    def b_retrieving(self):
         # and finally, underneath: retrieving dynamic data
-        self.play(FadeIn(w3, shift=UP * 0.12), run_time=0.9)
-        self.hold(3.0)
-
-
+        self.play(FadeIn(self.st.words[2], shift=UP * 0.12), run_time=0.9)

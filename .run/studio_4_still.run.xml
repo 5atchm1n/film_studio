@@ -1,6 +1,6 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="Studio · pilot · animatic (G3)" type="ShConfigurationType" folderName="Studio">
-    <option name="SCRIPT_TEXT" value=".venv/bin/studio animatic ai_retrieving_dynamic_data_beats" />
+  <configuration default="false" name="Studio · 4 · still (one frame per beat)" type="ShConfigurationType" folderName="Studio">
+    <option name="SCRIPT_TEXT" value=".venv/bin/studio still ai_retrieving_dynamic_data" />
     <option name="INDEPENDENT_SCRIPT_PATH" value="true" />
     <option name="SCRIPT_PATH" value="" />
     <option name="SCRIPT_OPTIONS" value="" />

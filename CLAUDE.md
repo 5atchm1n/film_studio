@@ -11,8 +11,8 @@ rules and the commands.
 - Self-check every render by sampling frames (`studio frames`, `studio sheet`) before showing it.
 - Work one act at a time (`studio act`, `studio range`) for fast loops.
 - `../visuels_mcp_harness/` is the read-only reference project: read it, never modify it.
-- The legacy film must stay pixel-identical: run `studio regress ai_retrieving_dynamic_data` after any change
-  that could affect it (kit, pipeline, legacy scene). Re-baseline only on an intentional visual change.
+- The reference film must stay pixel-identical: run `studio regress ai_retrieving_dynamic_data` after any change
+  that could affect it (kit, engine, pipeline, its beats). Re-baseline only on an intentional visual change.
 
 ## Design defaults (see `.claude/skills/film/lessons.md` for the full list)
 Minimal TRON (black, thin neon, DIN Alternate spaced caps, Futura numbers, Menlo code) · keywords, never sentences ·
@@ -48,7 +48,7 @@ studio/engine/     Film / Act / Beat, modes still · animatic · full (FILM_MODE
 studio/kit/        primitives → actors → motions; layout (named anchors); i18n (EN source, FR dict); scene (StudioScene)
 gallery/           scene.py + one committed PNG per kit piece (README.md shows them all)
 films/<name>/      film.toml (manifest) + film.py · brief.md · source.md · STATUS.md (gate, decisions, next step);
-                   baseline/ = regression reference (legacy film)
+                   baseline/ = regression reference (the reference film)
 films/_template/   starting point for a new film (brief.md, STATUS.md, film.py, film.toml) — use `studio new`
 .claude/skills/film/  the gated workflow: SKILL.md (loop) + g1_brief … g4_polish.md, lessons.md, checklist.md
 docs/              history: process log, versions + frames, audit, plan, blog backbone (README.md)
@@ -61,11 +61,11 @@ out/               renders (gitignored)
   already-translated text.
 - Act hand-offs live in one `@dataclass(slots=True) Stage` (`self.st`): no attribute is created inside an act.
 - Never assign `self.color` (or other style names) on a VGroup subclass: Manim treats it as a setter.
-- Highlights recolour in place (`motions.highlight`); the legacy film keeps its lit copies (pixel-identical).
+- Highlights recolour in place (`motions.highlight`); the reference film keeps its lit copies (pixel-identical).
 - Every new kit piece gets a function in `gallery/scene.py`; re-run `studio gallery` and look at the sheet.
 
 ## Film manifest (`films/<name>/film.toml`)
-`kind = "legacy"` films are plain Manim scenes driven by environment variables:
+`kind = "legacy"` (none left; still supported) = a plain Manim scene driven by environment variables:
 `FILM_LANG` (en|fr), `FILM_FROM` / `FILM_UPTO` (act names: earlier acts are computed but not drawn),
 `FILM_OUT` (directory where the scene writes `chapters.json` = `[[t, title], …]` and
 `meta.json` = `{lang, title, acts: {name: start_t}}`).
@@ -76,7 +76,10 @@ out/               renders (gitignored)
 - Default transition by id: same id → morph (silent swap if unchanged), new → fade in, missing → fade out;
   `morph_from={"new": "old"}` pairs different ids (block → word).
 - `motion(scene, prev, cur)` (full mode only) plays anything; the engine then puts exactly `cur` on screen.
-- Act chapter labels are automatic. Pilot: `films/ai_retrieving_dynamic_data_beats` (acts 01 and 06 as beats).
+- Act chapter labels are automatic (`auto_chapter=False`: the beats call `scene.chapter` themselves).
+- Live beats `Beat(name, play=fn, hold)`: `play(scene)` animates persistent actors on the Stage (time-dependent
+  pieces, films ported from plain scenes). Stills fast-forward and capture each beat's end; animatic = full.
+  Example: `films/ai_retrieving_dynamic_data` (35 live beats, pixel-identical to its pre-engine baseline).
 
 ## Roadmap
 Plan: `docs/PLAN_FILM_STUDIO.md` (phases 0–7). Done: 0 bootstrap · 1 tooling · 2 legacy migration · 3 kit extraction · 4 engine · 5 skill gates · 6 docs.

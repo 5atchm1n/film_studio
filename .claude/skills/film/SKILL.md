@@ -44,7 +44,7 @@ goes back to that gate: update brief.md / stills first, then re-validate.
 - Build from the kit (`gallery/README.md` shows every piece). New actor/motion only when a pattern repeats twice —
   add it to `studio/kit`, give it a gallery still (`studio gallery`).
 - English source text; every on-screen string gets its FR entry; check `--lang fr` stills before G3 exit.
-- Legacy film touched (kit, engine, pipeline)? `studio regress ai_retrieving_dynamic_data` must say IDENTICAL.
+- Kit / engine / pipeline touched? `studio regress ai_retrieving_dynamic_data` (the reference film) must say IDENTICAL.
 - Never render or announce a final without explicit validation of the 480p version.
 
 ## Files
