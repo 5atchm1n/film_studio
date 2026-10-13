@@ -145,3 +145,11 @@ def rack():
 def square_dot(p, color=CYAN, s=0.075):
     """Small filled square (data point on a map)."""
     return Square(s).set_fill(color, 1).set_stroke(width=0).move_to(p)
+
+
+def dimmed(mob, factor):
+    """Static dim for states: every stroke / fill opacity × factor (neon halos stay proportional)."""
+    for m in mob.family_members_with_points():
+        m.set_stroke(opacity=m.get_stroke_opacity() * factor, family=False)
+        m.set_fill(opacity=m.get_fill_opacity() * factor, family=False)
+    return mob

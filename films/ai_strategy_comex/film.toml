@@ -1,6 +1,7 @@
+# Pilot film (Phase 7): opener of the COMEX AI-strategy talk — assist ≠ automate.
 title = "AI strategy"
 kind = "engine"
 scene_file = "film.py"
 scene_class = "Film"
-acts = ["question", "answer"]
+acts = ["one_word", "assist", "automate"]
 langs = ["en", "fr"]
