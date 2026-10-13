@@ -108,6 +108,8 @@ Evidence: `film_studio` git log, `VERSIONS.md` § Generation 5, `frames/50–55`
   per gate, `STATUS.md` per film so any session (or a clone) resumes where the last one stopped; `studio extract`
   reads .pptx / .pdf sources.
 - **Phase 6 — these docs moved in** (copied; the reference stays read-only).
+- **Phase 7 — the pilot.** A 30 s COMEX opener (assist ≠ automate) from a 9-slide deck, through the four gates in one session: one MCQ round + one validation per gate, no gate re-opened. Self-checks caught 4 layout bugs at G2 before the user saw them. Stills render in ~3 s, the 1080p final in ~11 s. Kit gap found: a static `dimmed()` (added).
+  TODO: compare with the first film (~130 requests, ~50 versions).
 - TODO prose: the lesson — *regression first, refactor second*; and *stills before motion* (most feedback on the
   first film was about layout and words, which never needed animation to judge).
 

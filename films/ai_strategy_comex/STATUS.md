@@ -3,7 +3,7 @@
 *Read first by the `film` skill; updated at the end of every gate step.*
 
 ## Current gate
-G4 — full version with motions (FR, 32.5 s), waiting for validation; then final FR 1080p.
+Done — final rendered (FR, 1080p60, 32.2 s): `out/ai_strategy_comex/final-fr/Stratégie_IA_fr.mp4` + `.html`.
 
 ## Validations
 | Gate | Date | What was validated |
@@ -11,6 +11,8 @@ G4 — full version with motions (FR, 32.5 s), waiting for validation; then fina
 | G1 | 2026-10-13 | brief.md: one idea assist ≠ automate, 3 acts, key images |
 | G2 | 2026-10-13 | 9 stills (layout + words), FR + EN |
 | G3 | 2026-10-13 | animatic: order and pacing (FR, 29.8 s) |
+| G4 | 2026-10-13 | full 480p with motions (FR, 32.5 s) |
+| Final | 2026-10-13 | FR 1080p60 rendered after explicit validation (render ≈ 11 s) |
 
 ## Decisions (from MCQs — do not re-ask)
 - 2026-10-13 · Phase 7 pilot of film_studio. Source: `Strategie_IA_COMEX_Indigo.pptx` (extracted to `source.md`).
@@ -29,4 +31,4 @@ G4 — full version with motions (FR, 32.5 s), waiting for validation; then fina
 - G2 self-check fixes before showing: layout lowered, reply box no longer overlaps the request, router labels moved above (red rail crossed them), ✓ hidden under the reply box (z-order).
 
 ## Next step
-User validates the full 480p version (`out/ai_strategy_comex/dev-fr/player.html`) → `studio final ai_strategy_comex --lang fr --validated`.
+None. EN final on request: `studio final ai_strategy_comex --validated`. Outputs are gitignored: copy the mp4 / html where the talk needs them.

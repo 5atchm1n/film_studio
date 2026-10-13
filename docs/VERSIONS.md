@@ -92,4 +92,5 @@ EN + FR, 1,899/1,899 frames, ≈ 90 s). Frames: `frames/50–55`.
 | `f1ec3c0` | Change | Chat title CHAT · IA → CHAT · AI in English (validated), EN re-baselined; FR unchanged (`51_studio_chat_ai*`) |
 | `dc191b4` | 4 Engine | Film / Act / Beat, modes still · animatic · full; pilot = acts 01 + 06 as 13 beats: stills 3 s, animatic 5 s (21 s video), full 6 s (32 s video) (`53–55_beats_pilot_*`) |
 | `2f7bdab` | 5 Skill | Gates G1–G4 (one file each), `STATUS.md` per film, `studio extract` (pptx / pdf / md) |
-| (this) | 6 Docs | These docs copied in; Generation 5 recorded |
+| `3b5e5d3` | 6 Docs | These docs copied in; Generation 5 recorded |
+| `7f889f1` … (this) | 7 Pilot | First film made only through the gates: `films/ai_strategy_comex` (COMEX opener, assist ≠ automate, from `Strategie_IA_COMEX_Indigo.pptx`): G1 brief → G2 9 stills (FR + EN) → G3 animatic 29.8 s → G4 3 motions → final FR 1080p60, 32.2 s. One validation per gate; no re-done gate |
