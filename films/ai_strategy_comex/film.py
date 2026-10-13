@@ -215,7 +215,7 @@ class Film(FilmScene):
 
     acts = [
         Act("one_word", "01 · ONE WORD", "One word", [
-            Beat("title", s_title, hold=1.6, note="Title card: STRATÉGIE IA · DÉPASSER LE MYTHE."),
+            Beat("title", s_title, hold=2.6, note="Title card: STRATÉGIE IA · DÉPASSER LE MYTHE."),
             Beat("two_jobs", s_two_jobs, hold=2.0, morph_from={"chip": "title_ai"},
                  note="The title's AI becomes the chip; one rail to each side: ASSIST · SLOW / AUTOMATE · FAST."),
         ]),
@@ -223,14 +223,14 @@ class Film(FilmScene):
             Beat("ask", s_ask, hold=1.6, note="Left half: the CRC agent's chat receives a customer request; "
                                                   "customer history below. Right half dimmed."),
             Beat("suggest", s_suggest, hold=1.8, note="History → AI → a SUGGESTED REPLY drafted in the chat."),
-            Beat("validate", s_validate, hold=2.2, note="The agent validates (✓). HUMAN IN THE LOOP · ERROR CAUGHT."),
+            Beat("validate", s_validate, hold=3.2, note="The agent validates (✓). HUMAN IN THE LOOP · ERROR CAUGHT."),
         ]),
         Act("automate", "03 · AUTOMATE", "Automate", [
             Beat("tickets", s_tickets, hold=1.6, note="Right half: tickets → ROUTER (rules · models, not the AI chip, "
                                                          "which dims). Left half dimmed."),
-            Beat("route", s_route, hold=1.8, note="Routed straight to AGENT A / B / C. NO HUMAN · BOUNDED ERROR."),
-            Beat("uncertain", s_uncertain, hold=2.0, note="One uncertain ticket (?) goes to a human."),
-            Beat("words", s_words, hold=3.0, morph_from={"w_assist": "h_assist", "w_automate": "h_automate"},
+            Beat("route", s_route, hold=2.8, note="Routed straight to AGENT A / B / C. NO HUMAN · BOUNDED ERROR."),
+            Beat("uncertain", s_uncertain, hold=3.0, note="One uncertain ticket (?) goes to a human."),
+            Beat("words", s_words, hold=4.0, morph_from={"w_assist": "h_assist", "w_automate": "h_automate"},
                  note="End on words: ASSIST ≠ AUTOMATE."),
         ]),
     ]
