@@ -30,7 +30,7 @@ from studio.kit.actors import (Badge, Band, Chat, Chip, CodeFile, Module, data_b
 from studio.kit.i18n import Translator, current_lang
 from studio.kit.layout import (ANS_IN, BAND_Y, BUS_Y, CHAT_C, CHAT_H, CHAT_W, CHIP_POS, DATA_Y, IN_X,
                                OUT_Y, USER_POS)
-from studio.kit.motions import dim, morph, send
+from studio.kit.motions import dim, morph, send, words_from_blocks
 from studio.kit.scene import StudioScene
 from studio.kit.primitives import (BODY, CYAN, DIMC, GREEN, ICE, LABEL, MONO, NEON_OPS, ORANGE, RED, TITLE, flash_along, globe,
                                    icon_check, icon_doc, icon_format, icon_list, icon_lock, icon_log, icon_mail,
@@ -65,7 +65,6 @@ FR = {  # English source text → French
     "NO DUPLICATES": "SANS DOUBLONS", "WITH DUPLICATES": "AVEC DOUBLONS", "1.12 M": "1,12 M", "1.48 M": "1,48 M",
     "1.86 M": "1,86 M", "2.41 M": "2,41 M", "SEMANTIC LAYER": "COUCHE SÉMANTIQUE", "TOOL CALL": "APPEL D'OUTIL",
     "TABLES": "TABLEAUX", "CHARTS": "GRAPHIQUES", "REPORTS": "RAPPORTS",
-    "UNDERSTAND THE DATA BETTER": "MIEUX COMPRENDRE LES DONNÉES",
     "RETRIEVING DYNAMIC DATA": "RÉCUPÉRER DES DONNÉES DYNAMIQUES", "UNDERSTANDING": "COMPRÉHENSION",
     "DATA": "DONNÉES", "DIRECTOR": "DIRECTEUR", "USER": "UTILISATEUR",
     "PARKING SESSIONS · SEPT.?": "STATIONNEMENTS · SEPT. ?", "WEST ZONE": "ZONE OUEST", "0.31 M": "0,31 M",
@@ -73,9 +72,8 @@ FR = {  # English source text → French
     "09:14 sessions · west OK": "09:14 sessions · ouest OK", "TOOLS": "OUTILS", "0.74 M": "0,74 M",
     "DEFAULT · CAR PARKS": "PAR DÉFAUT · PARKINGS", "NO MAP": "SANS CARTE", "DIRECT QUERY": "REQUÊTE DIRECTE",
     "SENT TO MCP": "ENVOYÉ AU MCP", "TRUST": "CONFIANCE",
-    "WHAT DOES OUR DATA MEAN?": "QUE VEULENT DIRE NOS DONNÉES ?", "PARKING SESSIONS": "STATIONNEMENTS",
-    "ON-STREET SESSIONS": "SESSIONS VOIRIE", "OFF-STREET SESSIONS": "SESSIONS HORS VOIRIE",
-    "CAR PARKS · NO DUPLICATES": "PARKINGS · SANS DOUBLONS",
+    "WHAT DOES OUR DATA MEAN?": "QUE VEULENT DIRE NOS DONNÉES ?", "ON-STREET SESSIONS": "SESSIONS VOIRIE",
+    "OFF-STREET SESSIONS": "SESSIONS HORS VOIRIE",
     "CAR PARKS · NO DUPLICATES · 09/26": "PARKINGS · SANS DOUBLONS · 09/26", "occupancy()": "occupation()",
     "capacity()": "capacite()", "contracts()": "contrats()", "customers()": "clients()", "scope()": "perimetre()",
     "pricing()": "tarifs()", "SCOPE": "PÉRIMÈTRE", "RIGHTS": "DROITS", "audit.log": "journal.log",
@@ -322,7 +320,6 @@ class Film(StudioScene):
         traces, words = VGroup(), []
         for k, src in enumerate(sources):
             col, row = divmod(k, 3)
-            side = "LEFT" if col == 0 else "RIGHT"
             off = (1 - row) * 0.17 * chip.size
             end = chip.port(LEFT if col == 0 else RIGHT) + UP * off
             edge = src[0][1]
@@ -402,7 +399,6 @@ class Film(StudioScene):
         q_txt = self.st.user.type_question(self, tr("OUR CAR PARKS · PARIS?"))
         win = self.st.user.win
         u_bub = VGroup(self.st.user.q_box, q_txt)
-        q = VGroup()
         # the question goes from the chat to the chip
         p = packet(ICE)
         send(self, p, [[IN_X, OUT_Y, 0], chip.port(LEFT)], ICE, run_time=0.4)
@@ -756,7 +752,6 @@ class Film(StudioScene):
     def light_path(self, leaf, color):
         i = leaf // 2
         n1, n2, lv = self.st.tree
-        on = {id(n1[i]), id(n2[leaf])}
         dim = [m.animate.set_stroke(RED, 1.6 * 0.65, BOTTOM_DIM) for m in self.st.chaos] + \
               [a for n in (*n1, *n2) for a in self.node_style(n, DIMC, BOTTOM_DIM)] + \
               [l.animate.set_color(GREY_B).set_opacity(TEXT_DIM) for l in lv] + \
@@ -1356,9 +1351,7 @@ class Film(StudioScene):
     def condense(self):
         """End of act 05: everything is explained, the detail condenses into icons (big picture)."""
         chip, old = self.st.chip, self.st.box_shape
-        cx = chip.get_x()
 
-        tools_m = Module(icon_list(ORANGE).scale(1.3), [cx, chip.get_top()[1] + 0.5, 0])
         log_m = Module(icon_log(ORANGE), [chip.get_right()[0] + 0.6, OUT_Y, 0])
         left, right = old.get_left()[0], log_m.get_right()[0] + 0.4
         top, bottom = chip.get_top()[1] + 0.65, old.get_bottom()[1]   # no more TOOLS step in the frame
@@ -1373,14 +1366,12 @@ class Film(StudioScene):
         # semantic layer: the 5 domains → one icon, the 10 tables → one database
         mid = (left + right) / 2
         band = RoundedRectangle(corner_radius=0.12, width=right - left, height=0.9).move_to([mid, BAND_Y, 0])
-        layers = VGroup(*[RoundedRectangle(corner_radius=0.04, width=0.5, height=0.12).shift(UP * 0.1 * i)
-                          for i in range(3)]).set_stroke(CYAN, 1.6).set_fill(BODY, 1)
         mcp_lbl = self.st.band_label.copy().move_to(band)
         # the data: one plain big rectangle
         db_box, db = data_block(right - left, [mid, DATA_Y, 0], tr("DATA"))
         trunk = rail([chip.port(DOWN), [chip.port(DOWN)[0], band.get_top()[1], 0]], CYAN, 2).set_stroke(opacity=0.5)
         link = rail([band.get_bottom(), db.get_top() + UP * 0.05], CYAN, 1.6).set_stroke(opacity=0.5)
-        L_, R_ = box.get_left()[0], box.get_right()[0]
+        R_ = box.get_right()[0]
         self.play(Transform(self.st.frame, neon(box, ORANGE, 2)), self.st.clamps[1].animate.move_to([R_, OUT_Y, 0]),
                   FadeOut(VGroup(self.st.strip[0], self.st.strip[1], self.st.strip[2])),
                   FadeTransform(VGroup(self.st.gates[3], self.st.logs), log_m), FadeOut(self.st.scope_pill),
@@ -1418,8 +1409,6 @@ class Film(StudioScene):
         box, band = self.st.box_shape, self.st.band_shape
         # the harness is explained: no more detail inside, only the frame around the AI
         self.play(FadeOut(VGroup(self.st.gates, self.st.tools_icon, self.st.tag, self.st.tests)), run_time=0.6)
-        trust = L("TRUST", 14, ORANGE, spacing=8).next_to(box, RIGHT, 0.3).align_to(box, DOWN)
-        sem = L("SEMANTIC LAYER", 14, CYAN, spacing=8).next_to(band, RIGHT, 0.3)
         # the whole circuit lights up once, then the two key ideas flash next to their block
         self.play(flash_along(self.st.in_rail, WHITE, 5, run_time=0.9), flash_along(self.st.trunk, WHITE, 5, run_time=0.9),
                   *[flash_along(r, WHITE, 5, run_time=0.9) for r in self.st.roots], self.st.chip.pulse(), run_time=0.9)
@@ -1432,7 +1421,6 @@ class Film(StudioScene):
         for icon, name in [(icon_sheet(GREEN), "TABLES"), (bars, "CHARTS"), (icon_doc(GREEN), "REPORTS")]:
             outs.add(VGroup(icon, L(name, 9, GREEN, spacing=3)).arrange(DOWN, buff=0.15))
         outs.arrange(RIGHT, buff=0.5).move_to([(box.get_right()[0] + FW / 2) / 2 + 0.2, OUT_Y + 0.3, 0])
-        eff = L("UNDERSTAND THE DATA BETTER", 12, GREEN, spacing=4).next_to(outs, DOWN, 0.45)
         self.play(self.st.reply.animate.shift(UP * 0.04), self.st.ok.animate.shift(UP * 0.04), run_time=0.2)
         src = self.st.reply.copy()
         self.play(src.animate.move_to(outs).scale(0.8), run_time=0.7)
@@ -1451,7 +1439,7 @@ class Film(StudioScene):
         w1 = L("TRUST", 26, ORANGE, spacing=10)
         w2 = L("SEMANTIC LAYER", 26, CYAN, spacing=10)
         w3 = L("RETRIEVING DYNAMIC DATA", 20, WHITE, spacing=8)
-        words = VGroup(w1, w2, w3).arrange(DOWN, buff=0.55).move_to([0, 0.2, 0])
+        VGroup(w1, w2, w3).arrange(DOWN, buff=0.55).move_to([0, 0.2, 0])
         harness = VGroup(self.st.frame, self.st.frame_label, self.st.clamps)
         mcp = VGroup(self.st.band, self.st.band_label)
         data = self.st.tables
@@ -1459,9 +1447,8 @@ class Film(StudioScene):
         rest = [m for m in self.mobjects if id(m) not in keep and m is not self.chapter_lbl]
         self.play(*[FadeOut(m) for m in rest], run_time=0.7)
         # the three blocks re-centre, then turn into words
-        self.play(VGroup(harness, mcp, data).animate.scale(0.8).move_to([0, 0.2, 0]), run_time=0.9)
         # the harness becomes TRUST; the MCP becomes SEMANTIC LAYER, then UNDERSTANDING
-        self.play(FadeTransform(harness, w1), FadeTransform(mcp, w2), FadeOut(data, scale=0.8), run_time=1.2)
+        words_from_blocks(self, [(harness, w1), (mcp, w2)], fade=[data], center=[0, 0.2, 0])
         self.hold(1.0)
         und = L("UNDERSTANDING", 26, CYAN, spacing=10).move_to(w2)
         self.play(FadeTransform(w2, und), run_time=0.9)

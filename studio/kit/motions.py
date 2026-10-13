@@ -9,9 +9,9 @@ from manim import *
 from .primitives import rail
 
 
-def morph(scene, old, new, *extra, run_time=0.8):
+def morph_anims(old, new):
     """What leaves turns into what arrives (3Blue1Brown-style morph), element by element:
-    each old element is paired with a new one; extra elements fade out in place."""
+    each old element is paired with a new one; extra elements fade out / in place."""
     olds = [m for g in old for m in (g if isinstance(g, VGroup) and not hasattr(g, "text") and len(g) > 2
                                        and all(isinstance(x, VGroup) for x in g) else [g])]
     news = [m for g in new for m in (g if isinstance(g, VGroup) and not hasattr(g, "text") and len(g) > 2
@@ -19,8 +19,12 @@ def morph(scene, old, new, *extra, run_time=0.8):
     anims, n = [], min(len(olds), len(news))
     for o, w in zip(olds[:n], news[:n]):
         anims.append(FadeTransform(o, w, path_arc=-PI / 12))
-    anims += [FadeOut(o, scale=0.9) for o in olds[n:]] + [FadeIn(w, scale=0.9) for w in news[n:]]
-    scene.play(*anims, *extra, run_time=run_time, rate_func=rate_functions.ease_in_out_cubic)
+    return anims + [FadeOut(o, scale=0.9) for o in olds[n:]] + [FadeIn(w, scale=0.9) for w in news[n:]]
+
+
+def morph(scene, old, new, *extra, run_time=0.8):
+    """Default transition between two states (see morph_anims)."""
+    scene.play(*morph_anims(old, new), *extra, run_time=run_time, rate_func=rate_functions.ease_in_out_cubic)
 
 
 def send(scene, packet, points, color, run_time=1.0):
