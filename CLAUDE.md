@@ -25,6 +25,7 @@ no precise business figures unless provided.
 uv venv --python 3.12 .venv && uv pip install -e .   # setup (macOS fonts: DIN Alternate, Futura, Menlo)
 studio list                                          # films and their acts
 studio new <name> [--title T]                        # new engine film from films/_template (brief, film.py)
+studio extract <film> <file.pptx|pdf|md>            # G1 · source doc → films/<film>/source.md
 studio still <film> [--act A] [--lang fr]            # G2 · one PNG per beat + sheet + stills.html (seconds)
 studio animatic <film> [--act A]                     # G3 · 480p, default transitions only
 studio dev <film> [--lang fr] [--mode animatic]      # full film 480p + HTML player (engine: custom motions)
@@ -46,9 +47,10 @@ studio/            python package: cli.py, films.py (manifests), pipeline/ (rend
 studio/engine/     Film / Act / Beat, modes still · animatic · full (FILM_MODE)
 studio/kit/        primitives → actors → motions; layout (named anchors); i18n (EN source, FR dict); scene (StudioScene)
 gallery/           scene.py + one committed PNG per kit piece (README.md shows them all)
-films/<name>/      film.toml (manifest) + scene code; baseline/ = regression reference (hashes, mp4, sheets)
-films/_template/   starting point for a new film (brief.md, film.py, film.toml) — use `studio new`
-.claude/skills/film/  the gated workflow (G1 brief → G2 stills → G3 animatic → G4 polish + final)
+films/<name>/      film.toml (manifest) + film.py · brief.md · source.md · STATUS.md (gate, decisions, next step);
+                   baseline/ = regression reference (legacy film)
+films/_template/   starting point for a new film (brief.md, STATUS.md, film.py, film.toml) — use `studio new`
+.claude/skills/film/  the gated workflow: SKILL.md (loop) + g1_brief … g4_polish.md, lessons.md, checklist.md
 out/               renders (gitignored)
 ```
 
@@ -76,5 +78,5 @@ out/               renders (gitignored)
 - Act chapter labels are automatic. Pilot: `films/ai_retrieving_dynamic_data_beats` (acts 01 and 06 as beats).
 
 ## Roadmap
-Plan: `../visuels_mcp_harness/docs/PLAN_FILM_STUDIO.md` (phases 0–7). Done: 0 bootstrap · 1 tooling · 2 legacy migration · 3 kit extraction · 4 engine.
-Next: 5 skill gates · 6 docs · 7 pilot film.
+Plan: `../visuels_mcp_harness/docs/PLAN_FILM_STUDIO.md` (phases 0–7). Done: 0 bootstrap · 1 tooling · 2 legacy migration · 3 kit extraction · 4 engine · 5 skill gates.
+Next: 6 docs · 7 pilot film.

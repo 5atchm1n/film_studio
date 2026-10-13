@@ -98,7 +98,20 @@ def cmd_new(args):
     toml.write_text(toml.read_text().replace('"Film title"', json.dumps(args.title or args.name)))
     py = dest / "film.py"
     py.write_text(py.read_text().replace('title = "Film title"', f"title = {json.dumps(args.title or args.name)}"))
-    print(f"films/{name}: brief.md (G1) · film.py · film.toml — next: studio still {name}")
+    for md in ("brief.md", "STATUS.md"):
+        f = dest / md
+        f.write_text(f.read_text().replace("<film title>", args.title or args.name).replace("<name>", name))
+    print(f"films/{name}: brief.md · STATUS.md · film.py · film.toml — next (G1): studio extract {name} <source file>")
+
+
+def cmd_extract(args):
+    """G1: presentation / research doc → films/<film>/source.md (appends when called again)."""
+    from .pipeline.extract import extract
+    src = Path(args.source).expanduser().resolve()
+    if not src.exists():
+        raise SystemExit(f"No such file: {src}")
+    out = extract(src, films.FILMS / args.film)
+    print(f"{out} ({len(out.read_text(encoding='utf-8').splitlines())} lines)")
 
 
 def cmd_final(args):
@@ -211,6 +224,9 @@ def main(argv=None):
     s = add("new", cmd_new, "start a new engine film from films/_template", film=False, lang=False, opens=False)
     s.add_argument("name", help="folder name (snake_case)")
     s.add_argument("--title", help="film title (default: the name)")
+    s = add("extract", cmd_extract, "G1 · presentation or doc (.pptx .pdf .md) → films/<film>/source.md", lang=False,
+            opens=False)
+    s.add_argument("source", help="path to the .pptx / .pdf / .md")
     s = add("still", cmd_still, "G2 · every beat as a PNG (no animation) + sheet + HTML page (engine films)")
     s.add_argument("--act", help="only this act")
     s.add_argument("--from", dest="start", help="first act")

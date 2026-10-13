@@ -8,6 +8,8 @@ dependencies = [
   "av==19.0.1",      # PyAV: frame decoding, no ffmpeg binary needed
   "pillow==12.3.0",
   "numpy==2.5.4",
+  "python-pptx==1.0.2",  # G1: studio extract (.pptx)
+  "pypdf==6.20.1",       # G1: studio extract (.pdf)
 ]
 
 [project.scripts]
