@@ -1,0 +1,6 @@
+title = "AI strategy"
+kind = "engine"
+scene_file = "film.py"
+scene_class = "Film"
+acts = ["question", "answer"]
+langs = ["en", "fr"]
