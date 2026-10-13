@@ -81,10 +81,18 @@ def rise_to_title(scene, src, text, toc=None, extra=()):
     scene.chapter(text, toc, src=src, extra=extra)
 
 
+def condense_anims(pairs, fade=()):
+    return [FadeTransform(d, b) for d, b in pairs] + [FadeOut(m) for m in fade]
+
+
 def condense(scene, pairs, fade=(), run_time=1.6):
     """Once explained, details condense into big-picture blocks: each (detail, block) pair transforms,
     everything in `fade` disappears."""
-    scene.play(*[FadeTransform(d, b) for d, b in pairs], *[FadeOut(m) for m in fade], run_time=run_time)
+    scene.play(*condense_anims(pairs, fade), run_time=run_time)
+
+
+def words_anims(pairs, fade=()):
+    return [FadeTransform(b, w) for b, w in pairs] + [FadeOut(m, scale=0.8) for m in fade]
 
 
 def words_from_blocks(scene, pairs, fade=(), center=None, scale=0.8, run_time=1.2):
@@ -92,4 +100,4 @@ def words_from_blocks(scene, pairs, fade=(), center=None, scale=0.8, run_time=1.
     blocks = VGroup(*[b for b, _ in pairs], *fade)
     if center is not None:
         scene.play(blocks.animate.scale(scale).move_to(center), run_time=0.9)
-    scene.play(*[FadeTransform(b, w) for b, w in pairs], *[FadeOut(m, scale=0.8) for m in fade], run_time=run_time)
+    scene.play(*words_anims(pairs, fade), run_time=run_time)

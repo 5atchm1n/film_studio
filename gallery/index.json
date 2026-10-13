@@ -1,0 +1,97 @@
+[
+ [
+  "p01_palette",
+  "PALETTE",
+  "Colours carry meaning"
+ ],
+ [
+  "p02_type",
+  "TYPE",
+  "DIN Alternate labels, Futura numbers, Menlo code"
+ ],
+ [
+  "p03_neon",
+  "NEON",
+  "neon(): thin stroke + discreet halo"
+ ],
+ [
+  "p04_rails",
+  "RAILS",
+  "rail() right angles; flash_along()"
+ ],
+ [
+  "p05_icons",
+  "ICONS",
+  "icon_* pictograms, globe, rack, square_dot"
+ ],
+ [
+  "a01_chip",
+  "CHIP",
+  "Chip: the AI; pins appear when connected"
+ ],
+ [
+  "a02_chat",
+  "CHAT",
+  "Chat (question bubble, reply) + Badge (user identity)"
+ ],
+ [
+  "a03_panel",
+  "PANEL",
+  "panel_frame(): the side that explains the mechanism"
+ ],
+ [
+  "a04_band",
+  "BAND \u00b7 DATA",
+  "Band (semantic layer / MCP) and data_block()"
+ ],
+ [
+  "a05_harness",
+  "HARNESS",
+  "harness_frame(), harness_clamps(), Module"
+ ],
+ [
+  "a06_codefile",
+  "CODE FILE",
+  "CodeFile: lines light up as they run (step / reset)"
+ ],
+ [
+  "a07_packet",
+  "PACKET",
+  "packet() travelling on a rail (motions.send)"
+ ],
+ [
+  "m01_morph",
+  "MORPH",
+  "morph(): elements pair up and transform"
+ ],
+ [
+  "m02_send",
+  "SEND",
+  "send(): a packet travels along a rail"
+ ],
+ [
+  "m03_dim",
+  "DIM / LIGHT",
+  "dim() until relevant, light() when used"
+ ],
+ [
+  "m04_highlight",
+  "HIGHLIGHT",
+  "highlight(): recolour in place, returns a restore"
+ ],
+ [
+  "m05_rise",
+  "RISE TO TITLE",
+  "rise_to_title(): a finding becomes the chapter label"
+ ],
+ [
+  "m06_condense",
+  "CONDENSE",
+  "condense(): details \u2192 big-picture blocks"
+ ],
+ [
+  "m07_words",
+  "WORDS FROM BLOCKS",
+  "words_from_blocks(): end on words"
+ ]
+]

@@ -34,6 +34,10 @@ Add custom motions only where they carry the concept. Per-act loops (`studio act
 `ai_retrieving_dynamic_data` is the reference film. After touching the kit, pipeline or its scene:
 `studio regress ai_retrieving_dynamic_data` must report IDENTICAL for EN and FR.
 
+## Kit
+Build scenes from `studio/kit` (see `gallery/README.md` for every piece). Prefer an existing actor/motion;
+add a new one only when a pattern repeats twice, with a gallery still.
+
 ## Files
 - `lessons.md` — design rules learnt so far (update when the user gives new design feedback).
 - `checklist.md` — self-check list before showing a render.

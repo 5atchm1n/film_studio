@@ -14,7 +14,7 @@ from pathlib import Path
 
 from ..films import Film
 
-QUALITY = {"dev": ("-ql", "480p15"), "final": ("-qh", "1080p60")}
+QUALITY = {"dev": ("-ql", "480p15"), "final": ("-qh", "1080p60"), "gallery": ("-qm", "720p30")}
 
 
 @dataclass
