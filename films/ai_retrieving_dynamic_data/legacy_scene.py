@@ -41,6 +41,7 @@ FW = config.frame_width
 # --- Language: FILM_LANG=en (default) or fr. On-screen text is written in English; FR holds the French. --
 LANG = current_lang()
 FR = {  # English source text → French
+    "CHAT · AI": "CHAT · IA",
     "AI - Retrieving dynamic data": "IA - Récupérer des données dynamiques", "01 · THE AI": "01 · L'IA",
     "02 · OUR REALITY": "02 · NOTRE RÉALITÉ", "03 · THE PROBLEM": "03 · LE PROBLÈME",
     "04 · WHAT DOES OUR DATA MEAN?": "04 · QUE VEULENT DIRE NOS DONNÉES ?",
@@ -394,7 +395,7 @@ class Film(StudioScene):
         in_rail = rail([[IN_X, OUT_Y, 0], chip.port(LEFT)], DIMC, 2)
         out_rail = rail([chip.port(RIGHT), ANS_IN], DIMC, 2)
         morph(self, VGroup(done, outs, tag, branches), VGroup(icon, in_rail, out_rail))
-        self.st.user = user = Chat(CHAT_C, CHAT_W, CHAT_H, tr("CHAT · IA"))
+        self.st.user = user = Chat(CHAT_C, CHAT_W, CHAT_H, tr("CHAT · AI"))
         self.play(FadeTransform(icon, user), run_time=0.55, rate_func=rate_functions.ease_in_out_cubic)
         q_txt = self.st.user.type_question(self, tr("OUR CAR PARKS · PARIS?"))
         win = self.st.user.win
