@@ -28,6 +28,7 @@ source (pptx/pdf/md) ─extract─▶ G1 brief & acts ─▶ G2 stills ─▶ G3
 
 ## The loop inside every gate
 1. **Ask** ≤4 multiple-choice questions (recommended option first). Do not re-ask what STATUS.md already settled.
+   Plain words; when an option involves a technical concept, show a concrete example of what it means first.
 2. **Commit** the current state before changing anything (`git commit`; never push unless asked).
 3. **Build** the smallest useful scope: one act (`--act`), stills before motion, 480p before 1080p.
 4. **Self-check** with `checklist.md`: look at the sheet / sampled frames, fix obvious issues yourself first.

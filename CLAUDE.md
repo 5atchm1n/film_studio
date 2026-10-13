@@ -51,6 +51,7 @@ films/<name>/      film.toml (manifest) + film.py · brief.md · source.md · ST
                    baseline/ = regression reference (legacy film)
 films/_template/   starting point for a new film (brief.md, STATUS.md, film.py, film.toml) — use `studio new`
 .claude/skills/film/  the gated workflow: SKILL.md (loop) + g1_brief … g4_polish.md, lessons.md, checklist.md
+docs/              history: process log, versions + frames, audit, plan, blog backbone (README.md)
 out/               renders (gitignored)
 ```
 
@@ -78,5 +79,5 @@ out/               renders (gitignored)
 - Act chapter labels are automatic. Pilot: `films/ai_retrieving_dynamic_data_beats` (acts 01 and 06 as beats).
 
 ## Roadmap
-Plan: `../visuels_mcp_harness/docs/PLAN_FILM_STUDIO.md` (phases 0–7). Done: 0 bootstrap · 1 tooling · 2 legacy migration · 3 kit extraction · 4 engine · 5 skill gates.
-Next: 6 docs · 7 pilot film.
+Plan: `docs/PLAN_FILM_STUDIO.md` (phases 0–7). Done: 0 bootstrap · 1 tooling · 2 legacy migration · 3 kit extraction · 4 engine · 5 skill gates · 6 docs.
+Next: 7 pilot film.
