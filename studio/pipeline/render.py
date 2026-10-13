@@ -37,14 +37,15 @@ def manim(scene_dir: Path, scene_file: str, scene_class: str, quality: str, name
 
 
 def render(film: Film, tag: str, quality: str = "dev", lang: str = "en", start: str | None = None,
-           end: str | None = None) -> Render:
+           end: str | None = None, mode: str = "full") -> Render:
+    """mode (engine films only): animatic = default transitions everywhere; full = custom motions where defined."""
     if lang not in film.langs:
         raise SystemExit(f"{film.name} has no '{lang}' version (langs: {', '.join(film.langs)})")
     d = film.out / tag
     if d.exists():
         shutil.rmtree(d)
     d.mkdir(parents=True)
-    env = {"FILM_LANG": lang, "FILM_OUT": str(d)}
+    env = {"FILM_LANG": lang, "FILM_OUT": str(d), "FILM_MODE": mode}
     if start:
         env["FILM_FROM"] = film.check_act(start)
     if end:

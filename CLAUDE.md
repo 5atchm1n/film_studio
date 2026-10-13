@@ -24,7 +24,10 @@ no precise business figures unless provided.
 ```bash
 uv venv --python 3.12 .venv && uv pip install -e .   # setup (macOS fonts: DIN Alternate, Futura, Menlo)
 studio list                                          # films and their acts
-studio dev <film> [--lang fr]                        # full film 480p + looping HTML player
+studio new <name> [--title T]                        # new engine film from films/_template (brief, film.py)
+studio still <film> [--act A] [--lang fr]            # G2 · one PNG per beat + sheet + stills.html (seconds)
+studio animatic <film> [--act A]                     # G3 · 480p, default transitions only
+studio dev <film> [--lang fr] [--mode animatic]      # full film 480p + HTML player (engine: custom motions)
 studio act <film> <act>                              # one act 480p + loop page
 studio range <film> <from> <to>                      # acts from..to 480p + loop page
 studio sheet <video> [-n 8] [--chapters out.json]    # contact sheet (grid, or one frame per chapter)
@@ -40,10 +43,11 @@ studio final <film> --validated                      # 1080p60 + mp4 + HTML — 
 ## Layout
 ```
 studio/            python package: cli.py, films.py (manifests), pipeline/ (render, player, sheets, regress, video)
+studio/engine/     Film / Act / Beat, modes still · animatic · full (FILM_MODE)
 studio/kit/        primitives → actors → motions; layout (named anchors); i18n (EN source, FR dict); scene (StudioScene)
 gallery/           scene.py + one committed PNG per kit piece (README.md shows them all)
 films/<name>/      film.toml (manifest) + scene code; baseline/ = regression reference (hashes, mp4, sheets)
-films/_template/   starting point for a new film (brief.md)
+films/_template/   starting point for a new film (brief.md, film.py, film.toml) — use `studio new`
 .claude/skills/film/  the gated workflow (G1 brief → G2 stills → G3 animatic → G4 polish + final)
 out/               renders (gitignored)
 ```
@@ -61,8 +65,16 @@ out/               renders (gitignored)
 `kind = "legacy"` films are plain Manim scenes driven by environment variables:
 `FILM_LANG` (en|fr), `FILM_FROM` / `FILM_UPTO` (act names: earlier acts are computed but not drawn),
 `FILM_OUT` (directory where the scene writes `chapters.json` = `[[t, title], …]` and
-`meta.json` = `{lang, title, acts: {name: start_t}}`). Engine films (Film/Act/Beat, still|animatic|full) come in Phase 4.
+`meta.json` = `{lang, title, acts: {name: start_t}}`).
+
+`kind = "engine"` films derive from `studio.engine.FilmScene`: `acts = [Act(name, title, toc, [Beat(...)])]`, `FR`,
+`build_stage()`. A `Beat(name, state, motion=None, hold, morph_from, note, run_time)`:
+- `state(stage) -> {id: mobject}` is **pure** (fresh mobjects each call): any beat can be drawn alone (stills).
+- Default transition by id: same id → morph (silent swap if unchanged), new → fade in, missing → fade out;
+  `morph_from={"new": "old"}` pairs different ids (block → word).
+- `motion(scene, prev, cur)` (full mode only) plays anything; the engine then puts exactly `cur` on screen.
+- Act chapter labels are automatic. Pilot: `films/ai_retrieving_dynamic_data_beats` (acts 01 and 06 as beats).
 
 ## Roadmap
-Plan: `../visuels_mcp_harness/docs/PLAN_FILM_STUDIO.md` (phases 0–7). Done: 0 bootstrap · 1 tooling · 2 legacy migration · 3 kit extraction.
-Next: 4 engine · 5 skill gates · 6 docs · 7 pilot film.
+Plan: `../visuels_mcp_harness/docs/PLAN_FILM_STUDIO.md` (phases 0–7). Done: 0 bootstrap · 1 tooling · 2 legacy migration · 3 kit extraction · 4 engine.
+Next: 5 skill gates · 6 docs · 7 pilot film.

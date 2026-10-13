@@ -5,7 +5,7 @@ description: Make or edit a short concept video in film_studio (Manim, minimal T
 
 # Film workflow
 
-Skeleton (Phase 0). Gates G2–G3 need the Film/Act/Beat engine (Phase 4); until then only legacy films exist.
+Skeleton (gates detailed in Phase 5). New films are engine films: `studio new <name>`.
 Read `CLAUDE.md` (rules + commands) and `lessons.md` (design rules) before any change.
 
 ## Every gate
@@ -19,15 +19,16 @@ Read `CLAUDE.md` (rules + commands) and `lessons.md` (design rules) before any c
 Input: a presentation or research doc. Output: `films/<name>/brief.md` from `films/_template/brief.md`
 (audience, the one idea, 3–6 acts, one key image per act, vocabulary, actors). Settle open points with MCQs.
 
-## G2 — Stills *(Phase 4)*
-Write each beat as a screen *state* (actors, positions, text, what is lit). `studio still <film>` → one frame
-per beat on a sheet. Iterate on layout and wording here, not in animation.
+## G2 — Stills
+Write each beat as a pure screen *state* `{id: mobject}` (actors, positions, text, what is lit), no motion.
+`studio still <film>` → one PNG per beat, sheet, stills.html (seconds). Iterate on layout and wording here.
 
-## G3 — Animatic *(Phase 4)*
-`studio animatic <film>` → 480p with default transitions (paired morph, fade). Validate pacing and story.
+## G3 — Animatic
+`studio animatic <film>` → 480p with default transitions (same id morphs, new fades in, missing fades out;
+`morph_from` pairs ids). Tune `hold` / `run_time`. Validate pacing and story.
 
 ## G4 — Polish & final
-Add custom motions only where they carry the concept. Per-act loops (`studio act`, `studio range`).
+Add `motion=` to a beat only where it carries the concept (`studio dev` / `act` render full mode). Per-act loops (`studio act`, `studio range`).
 `studio final <film> --validated` only after the user explicitly validates.
 
 ## Legacy film

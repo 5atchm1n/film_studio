@@ -19,9 +19,19 @@ def _open(path: Path, args) -> None:
         subprocess.run(["open", str(path)])
 
 
+def _mode(args, film):
+    mode = getattr(args, "mode", None) or "full"
+    if mode != "full" and film.kind != "engine":
+        raise SystemExit(f"{film.name} is a {film.kind} film: only engine films have an animatic mode")
+    return mode
+
+
 def _draft(args, film, tag, start=None, end=None, loop=True):
     """480p render + sheet + looping HTML player, then open the player."""
-    rd = render(film, f"{tag}-{args.lang}", "dev", args.lang, start, end)
+    mode = _mode(args, film)
+    if mode != "full":
+        tag = f"{mode}-{tag}"
+    rd = render(film, f"{tag}-{args.lang}", "dev", args.lang, start, end, mode)
     sheets.grid(rd.video, rd.dir / "sheet.png")
     if rd.chapters:
         sheets.by_chapter(rd.video, rd.chapters, rd.dir / "chapters.png")
@@ -51,6 +61,44 @@ def cmd_range(args):
     if f.acts.index(f.check_act(args.start)) > f.acts.index(f.check_act(args.end)):
         raise SystemExit(f"'{args.start}' comes after '{args.end}' (acts: {' '.join(f.acts)})")
     _draft(args, f, f"range-{args.start}-{args.end}", args.start, args.end)
+
+
+def _engine(film):
+    if film.kind != "engine":
+        raise SystemExit(f"{film.name} is a {film.kind} film: stills and animatics need an engine film (Film/Act/Beat)")
+    return film
+
+
+def cmd_still(args):
+    from .pipeline.stills import stills
+    f = _engine(films.load(args.film))
+    d = stills(f, args.lang, args.act or args.start, args.act or args.end)
+    print(d / "sheet.png")
+    _open(d / "stills.html", args)
+
+
+def cmd_animatic(args):
+    f = _engine(films.load(args.film))
+    args.mode = "animatic"
+    if args.act:
+        _draft(args, f, f"act-{f.check_act(args.act)}", args.act, args.act)
+    else:
+        _draft(args, f, "film", loop=True)
+
+
+def cmd_new(args):
+    """Start a new engine film from films/_template (brief.md, film.py, film.toml)."""
+    import re as _re
+    name = _re.sub(r"\W+", "_", args.name.lower()).strip("_")
+    dest = films.FILMS / name
+    if dest.exists():
+        raise SystemExit(f"films/{name} already exists")
+    shutil.copytree(films.FILMS / "_template", dest, ignore=shutil.ignore_patterns("__pycache__"))
+    toml = dest / "film.toml"
+    toml.write_text(toml.read_text().replace('"Film title"', json.dumps(args.title or args.name)))
+    py = dest / "film.py"
+    py.write_text(py.read_text().replace('title = "Film title"', f"title = {json.dumps(args.title or args.name)}"))
+    print(f"films/{name}: brief.md (G1) · film.py · film.toml — next: studio still {name}")
 
 
 def cmd_final(args):
@@ -160,11 +208,23 @@ def main(argv=None):
         return s
 
     add("list", cmd_list, "list films and their acts", film=False, lang=False, opens=False)
+    s = add("new", cmd_new, "start a new engine film from films/_template", film=False, lang=False, opens=False)
+    s.add_argument("name", help="folder name (snake_case)")
+    s.add_argument("--title", help="film title (default: the name)")
+    s = add("still", cmd_still, "G2 · every beat as a PNG (no animation) + sheet + HTML page (engine films)")
+    s.add_argument("--act", help="only this act")
+    s.add_argument("--from", dest="start", help="first act")
+    s.add_argument("--to", dest="end", help="last act")
+    s = add("animatic", cmd_animatic, "G3 · 480p with default transitions only + looping player (engine films)")
+    s.add_argument("--act", help="only this act")
     s = add("dev", cmd_dev, "full film, 480p draft + HTML player")
+    s.add_argument("--mode", choices=["full", "animatic"], help="engine films: full (default) or animatic")
     s.add_argument("--loop", action="store_true", help="player loops by default")
     s = add("act", cmd_act, "one act, 480p draft + looping HTML player")
+    s.add_argument("--mode", choices=["full", "animatic"], help="engine films: full (default) or animatic")
     s.add_argument("act")
     s = add("range", cmd_range, "acts <from>..<to>, 480p draft + looping HTML player")
+    s.add_argument("--mode", choices=["full", "animatic"], help="engine films: full (default) or animatic")
     s.add_argument("start", metavar="from")
     s.add_argument("end", metavar="to")
     s = add("final", cmd_final, "1080p60 render + mp4 + HTML — only after explicit validation")
