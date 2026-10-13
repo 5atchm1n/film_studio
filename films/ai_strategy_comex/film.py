@@ -11,9 +11,10 @@ import numpy as np
 from manim import *
 
 from studio.engine import Act, Beat, FilmScene
-from studio.kit.actors import Badge, Chat, Chip, Module, data_block
-from studio.kit.primitives import (BODY, CYAN, DIMC, GREEN, ICE, ORANGE, RED, dimmed, icon_check, icon_user, label,
-                                   neon, rail)
+from studio.kit.actors import Badge, Chat, Chip, Module, data_block, packet
+from studio.kit.motions import send
+from studio.kit.primitives import (BODY, CYAN, DIMC, GREEN, ICE, ORANGE, RED, dimmed, flash_along, icon_check, icon_user,
+                                   label, neon, rail)
 
 FR = {  # English on-screen text → French
     "AI": "IA", "STRATEGY": "STRATÉGIE", "BEYOND THE MYTH": "DÉPASSER LE MYTHE",
@@ -199,6 +200,60 @@ def s_uncertain(st):
     return automate_state(st, 2)
 
 
+# --- Motions (G4): deliberate on the assist side, rapid on the automate side ------------------------------------
+def corners(r):
+    """Corner points of a rail (right-angle polyline)."""
+    return [*r.get_start_anchors(), r.get_end_anchors()[-1]]
+
+
+def swap(sc, prev, cur, ids, run_time=0.4):
+    """Morph the given ids from prev to cur (used at the start of a motion)."""
+    sc.play(*[ReplacementTransform(prev[k], cur[k]) for k in ids], run_time=run_time)
+
+
+def m_suggest(sc, prev, cur):
+    """Slow: the history goes to the AI, which drafts a reply into the chat, line by line."""
+    swap(sc, prev, cur, ["hist_rail"])
+    p = packet(CYAN)
+    send(sc, p, corners(cur["hist_rail"]), CYAN, run_time=1.0)
+    sc.play(cur["chip"].pulse(CYAN), FadeOut(p), run_time=0.45)
+    p = packet(CYAN)
+    send(sc, p, corners(cur["r_assist"]), CYAN, run_time=1.0)
+    box, (head, lines) = cur["reply"][0], cur["reply"][1]
+    sc.play(FadeOut(p), Create(box), FadeIn(head), run_time=0.5)
+    sc.play(LaggedStart(*[Create(l) for l in lines], lag_ratio=0.6), run_time=0.7)
+
+
+def m_route(sc, prev, cur):
+    """Fast: a stream of tickets runs through the router and fans out to the agents, no human."""
+    swap(sc, prev, cur, ["a_rails", "agents"])
+    entry = corners(cur["in_rail"])
+    paths = [rail(entry + corners(r)[1:]) for r in cur["a_rails"]]
+    flying = [sc.stage.ticket().scale(0.6).move_to(entry[0]) for _ in range(9)]
+    with sc.exact():
+        sc.play(LaggedStart(*[MoveAlongPath(t, paths[k % 3], rate_func=rate_functions.ease_in_out_sine)
+                              for k, t in enumerate(flying)], lag_ratio=0.22),
+                flash_along(cur["router"][0][1], WHITE, 4, run_time=1.9), run_time=1.9)
+    sc.play(*[FadeOut(t) for t in flying], FadeIn(cur["routed"]), FadeIn(cur["cap_automate"], shift=DOWN * 0.05),
+            run_time=0.4)
+
+
+def m_uncertain(sc, prev, cur):
+    """One ticket the router cannot decide: it turns red and goes to a human."""
+    entry = corners(cur["in_rail"])
+    t = sc.stage.ticket().scale(0.6).move_to(entry[0])
+    with sc.exact():
+        sc.play(MoveAlongPath(t, rail(entry)), run_time=0.45, rate_func=rate_functions.ease_in_out_sine)
+    q = cur["uncertain"][0].copy().move_to(cur["router"][0].get_center())
+    sc.play(ReplacementTransform(t, q), Flash(cur["router"][0], color=RED, flash_radius=0.5, num_lines=10),
+            run_time=0.4)
+    sc.play(Create(cur["h_rail"]), FadeIn(cur["human"], shift=UP * 0.1), run_time=0.5)
+    down = [cur["router"][0].get_bottom(), cur["h_rail"].get_end(), cur["uncertain"][0].get_center()]
+    send(sc, q, down, RED, run_time=0.7)
+    sc.play(FadeIn(cur["uncertain"][1], shift=LEFT * 0.05), run_time=0.3)
+    sc.remove(q)
+
+
 def s_words(st):
     a, neq, b = st.L("ASSIST", 30, CYAN, spacing=12), Text("≠", font="Futura", font_size=54, color=ICE), \
         st.L("AUTOMATE", 30, ORANGE, spacing=12)
@@ -215,22 +270,22 @@ class Film(FilmScene):
 
     acts = [
         Act("one_word", "01 · ONE WORD", "One word", [
-            Beat("title", s_title, hold=2.6, note="Title card: STRATÉGIE IA · DÉPASSER LE MYTHE."),
+            Beat("title", s_title, hold=2.2, note="Title card: STRATÉGIE IA · DÉPASSER LE MYTHE."),
             Beat("two_jobs", s_two_jobs, hold=2.0, morph_from={"chip": "title_ai"},
                  note="The title's AI becomes the chip; one rail to each side: ASSIST · SLOW / AUTOMATE · FAST."),
         ]),
         Act("assist", "02 · ASSIST", "Assist", [
-            Beat("ask", s_ask, hold=1.6, note="Left half: the CRC agent's chat receives a customer request; "
+            Beat("ask", s_ask, hold=1.2, note="Left half: the CRC agent's chat receives a customer request; "
                                                   "customer history below. Right half dimmed."),
-            Beat("suggest", s_suggest, hold=1.8, note="History → AI → a SUGGESTED REPLY drafted in the chat."),
-            Beat("validate", s_validate, hold=3.2, note="The agent validates (✓). HUMAN IN THE LOOP · ERROR CAUGHT."),
+            Beat("suggest", s_suggest, m_suggest, hold=0.8, note="History → AI → a SUGGESTED REPLY drafted in the chat."),
+            Beat("validate", s_validate, hold=2.6, note="The agent validates (✓). HUMAN IN THE LOOP · ERROR CAUGHT."),
         ]),
         Act("automate", "03 · AUTOMATE", "Automate", [
             Beat("tickets", s_tickets, hold=1.6, note="Right half: tickets → ROUTER (rules · models, not the AI chip, "
                                                          "which dims). Left half dimmed."),
-            Beat("route", s_route, hold=2.8, note="Routed straight to AGENT A / B / C. NO HUMAN · BOUNDED ERROR."),
-            Beat("uncertain", s_uncertain, hold=3.0, note="One uncertain ticket (?) goes to a human."),
-            Beat("words", s_words, hold=4.0, morph_from={"w_assist": "h_assist", "w_automate": "h_automate"},
+            Beat("route", s_route, m_route, hold=2.0, note="Routed straight to AGENT A / B / C. NO HUMAN · BOUNDED ERROR."),
+            Beat("uncertain", s_uncertain, m_uncertain, hold=2.2, note="One uncertain ticket (?) goes to a human."),
+            Beat("words", s_words, hold=3.0, morph_from={"w_assist": "h_assist", "w_automate": "h_automate"},
                  note="End on words: ASSIST ≠ AUTOMATE."),
         ]),
     ]
